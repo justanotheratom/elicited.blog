@@ -43,12 +43,22 @@ const backUrl = SITE.showBackButton ? Astro.url.pathname : "/";
 </main>
 
 <script>
+  const safeSession = {
+    set(key: string, value: string): void {
+      try {
+        window?.sessionStorage?.setItem?.(key, value);
+      } catch (error) {
+        console.warn("sessionStorage is unavailable:", error);
+      }
+    },
+  };
+
   document.addEventListener("astro:page-load", () => {
     const mainContent: HTMLElement | null =
       document.querySelector("#main-content");
     const backUrl = mainContent?.dataset?.backurl;
     if (backUrl) {
-      sessionStorage.setItem("backUrl", backUrl);
+      safeSession.set("backUrl", backUrl);
     }
   });
 </script>

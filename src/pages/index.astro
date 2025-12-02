@@ -111,11 +111,21 @@ const recentPosts = sortedPosts.filter(({ data }) => !data.featured);
 </Layout>
 
 <script>
+  const safeSession = {
+    set(key: string, value: string): void {
+      try {
+        window?.sessionStorage?.setItem?.(key, value);
+      } catch (error) {
+        console.warn("sessionStorage is unavailable:", error);
+      }
+    },
+  };
+
   document.addEventListener("astro:page-load", () => {
     const indexLayout = (document.querySelector("#main-content") as HTMLElement)
       ?.dataset?.layout;
     if (indexLayout) {
-      sessionStorage.setItem("backUrl", "/");
+      safeSession.set("backUrl", "/");
     }
   });
 </script>

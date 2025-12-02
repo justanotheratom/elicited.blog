@@ -18,6 +18,16 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
 </Layout>
 
 <script>
+  const safeSession = {
+    set(key: string, value: string): void {
+      try {
+        window?.sessionStorage?.setItem?.(key, value);
+      } catch (error) {
+        console.warn("sessionStorage is unavailable:", error);
+      }
+    },
+  };
+
   function initSearch() {
     const pageFindSearch: HTMLElement | null =
       document.querySelector("#pagefind-search");
@@ -52,7 +62,9 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
           history.replaceState(history.state, "", "?" + params.toString()); // Push the new URL without reloading
 
           const backUrl = pageFindSearch?.dataset?.backurl;
-          sessionStorage.setItem("backUrl", backUrl + "?" + params.toString());
+          if (backUrl) {
+            safeSession.set("backUrl", backUrl + "?" + params.toString());
+          }
 
           return term;
         },

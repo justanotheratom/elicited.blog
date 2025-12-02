@@ -20,12 +20,23 @@ import { SITE } from "@/config";
 }
 
 <script>
-  /* Update Search Praam */
+  const safeSession = {
+    get(key: string): string | null {
+      try {
+        return window?.sessionStorage?.getItem?.(key) ?? null;
+      } catch (error) {
+        console.warn("sessionStorage is unavailable:", error);
+        return null;
+      }
+    },
+  };
+
+  /* Update Search Param */
   function updateGoBackUrl() {
     const backButton: HTMLAnchorElement | null =
       document.querySelector("#back-button");
 
-    const backUrl = sessionStorage.getItem("backUrl");
+    const backUrl = safeSession.get("backUrl");
 
     if (backUrl && backButton) {
       backButton.href = backUrl;
