@@ -1,6 +1,6 @@
 ---
-title: "Designing Clean Multi-Module Agents in DSPy"
-description: "How to compose typed DSPy submodules with Protocol contracts."
+title: "Managing Tools in DSPy"
+description: "Type-Safe Tool Contracts for Multi-Module DSPy Programs"
 pubDatetime: 2025-12-02T10:00:00Z
 modDatetime: 2025-12-02T10:00:00Z
 author: "Sanket Patel"
@@ -12,7 +12,7 @@ tags:
   - agents
 ---
 
-# Designing Clean Multi-Module Agents in DSPy
+# Type-Safe Tool Contracts for Multi-Module DSPy Programs
 
 Building production AI agents with DSPy is straightforward—until you need multiple specialized submodules, each with its own tools and behaviors. At that point, codebases tend to devolve into stringly-typed tool names, hidden dependencies, and orchestration spaghetti. This post presents an architecture that keeps things clean: explicit contracts, type safety, and a clear separation between program logic and runtime environments.
 
@@ -204,6 +204,6 @@ Training and inference are cleanly decoupled—only the tool registry changes be
 
 ## Conclusion
 
-The path to maintainable multi-module DSPy agents runs through explicit contracts. Put Signatures and Tool Protocols inside each module. Compose those Protocols into a single top-level interface. Let training and inference supply different implementations against that fixed interface. Keep your artifacts clean.
+The path to maintainable multi-module DSPy Programs runs through explicit contracts. Put Signatures and Tool Protocols inside each module. Compose those Protocols into a single top-level interface. Let training and inference supply different implementations against that fixed interface. Keep your artifacts clean.
 
 The result is a system that's predictable, type-safe, and easy to reason about—exactly what you need when your agent architecture grows beyond a single module.
