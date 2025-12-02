@@ -3,9 +3,9 @@ layout: ../layouts/AboutLayout.astro
 title: "About"
 ---
 
-I'm a systems engineer turned indie builder, currently crafting consumer mobile apps and exploring what's possible at the edge of AI.
+I'm a Systems Software Engineer turned Indie Builder, currently crafting consumer mobile apps and exploring what's possible at the edge of AI.
 
-My career started at Microsoft, where I spent over a decade shipping software at scale. I worked on Windows USB drivers, then moved to Office 365 Security, and wrapped up my time there on Azure Cosmos DB. But my roots go deeper—back to UT Austin, where I studied Electrical Engineering. I distinctly remember a textbook, *Introduction to Computing Systems: From Bits & Gates to C & Beyond* by Patt and Patel, which showed me how electrons become software. That bottom-up mental model never left me.
+My career started at Microsoft, where I spent over 15 years shipping software at scale. I worked on Windows USB drivers, then moved to Office 365 Security, and wrapped up my time there on Azure Cosmos DB. But my roots go deeper—back to UT Austin, where I studied Electrical Engineering. I distinctly remember a textbook, *Introduction to Computing Systems: From Bits & Gates to C & Beyond* by Patt and Patel, which showed me how electrons become software. That bottom-up mental model never left me.
 
 From there, I went low: transistors, logic gates, OS internals, kernel debugging. Then I started climbing the stack—systems programming, platform work, eventually shipping products to millions. Microsoft was home for a long time.
 
