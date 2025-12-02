@@ -3,7 +3,7 @@ export const SITE = {
   author: "Your Name",
   profile: "https://example.com/",
   desc: "A personal blog about engineering, learning, and creativity.",
-  title: "My Blog",
+  title: "Elicited",
   ogImage: "astropaper-og.jpg",
   lightAndDarkMode: true,
   postPerIndex: 4,

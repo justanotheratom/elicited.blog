@@ -1,0 +1,209 @@
+---
+title: "Designing Clean Multi-Module Agents in DSPy"
+description: "How to compose typed DSPy submodules with Protocol contracts."
+pubDatetime: 2025-12-02T10:00:00Z
+modDatetime: 2025-12-02T10:00:00Z
+author: "Sanket Patel"
+featured: false
+draft: false
+tags:
+  - dspy
+  - architecture
+  - agents
+---
+
+# Designing Clean Multi-Module Agents in DSPy
+
+Building production AI agents with DSPy is straightforward—until you need multiple specialized submodules, each with its own tools and behaviors. At that point, codebases tend to devolve into stringly-typed tool names, hidden dependencies, and orchestration spaghetti. This post presents an architecture that keeps things clean: explicit contracts, type safety, and a clear separation between program logic and runtime environments.
+
+## Four Problems With Tool Management in DSPy
+
+As soon as you build anything non-trivial, you'll hit these issues:
+
+**Tools are passed as strings.** DSPy's default pattern looks like `ReAct(tools=["web_search", "stock_price"])`. One typo and the whole thing silently fails. There's no IDE autocomplete, no type checking, and no documentation of expected method signatures.
+
+**Individual modules don't declare their tool requirements.** Your SearchAgent needs web search. Your FinanceAgent needs price lookups and news feeds. But nothing in the code explicitly states these dependencies—they're implicit in the implementation, discoverable only by reading through the source.
+
+**Top-level orchestrators have unclear cumulative requirements.** When an orchestrator composes multiple submodules, what tools must the runtime environment provide? You'd have to manually trace through every submodule to build the complete list. Miss one and you get runtime errors.
+
+**There's no clean way to swap tools between training and inference.** During training you want fast mock implementations. In production you need real API clients. DSPy doesn't prescribe how to manage this separation, leading to ad-hoc solutions that couple tool implementations to program logic.
+
+What we want instead is typed, inspectable, explicit tool contracts that live alongside the program code, are versioned with it, and can be validated at both training and inference time.
+
+## The Architecture: Protocols, Signatures, and Composition
+
+The solution uses three Python constructs working together: **Protocol classes** define tool interfaces, **DSPy Signatures** define module inputs and outputs, and **Protocol inheritance** composes requirements for multi-module systems.
+
+### Defining Submodule Contracts
+
+Each submodule in your system should declare exactly two things: what data it takes and produces (the Signature), and what tools it needs to function (the Protocol).
+
+Here's a search agent:
+
+```python
+from typing import Protocol, List
+import dspy
+
+class SearchSignature(dspy.Signature):
+    query: str = dspy.InputField()
+    snippets: str = dspy.OutputField()
+
+class SearchTools(Protocol):
+    def web_search(self, query: str, top_k: int = 5) -> List[str]: ...
+
+class SearchAgent(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.react = InterfaceReAct.from_protocol(
+            signature=SearchSignature,
+            protocol=SearchTools,
+            max_iters=8,
+        )
+
+    def forward(self, **kwargs):
+        return self.react(**kwargs)
+```
+
+And a finance agent with different requirements:
+
+```python
+class FinanceSignature(dspy.Signature):
+    question: str = dspy.InputField()
+    answer: str = dspy.OutputField()
+
+class FinanceTools(Protocol):
+    def stock_price(self, ticker: str) -> float: ...
+    def company_news(self, ticker: str) -> List[str]: ...
+
+class FinanceAgent(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.react = InterfaceReAct.from_protocol(
+            signature=FinanceSignature,
+            protocol=FinanceTools,
+            max_iters=8,
+        )
+
+    def forward(self, **kwargs):
+        return self.react(**kwargs)
+```
+
+Each module is now self-documenting. The Protocol advertises tool requirements in a way that's checkable by type checkers and introspectable at runtime.
+
+### Composing Top-Level Requirements
+
+When your orchestrator uses multiple submodules, its runtime environment must satisfy all their tool requirements. Protocol inheritance makes this explicit:
+
+```python
+class TopLevelTools(SearchTools, FinanceTools, Protocol):
+    """Environment must provide all tools required by all submodules."""
+    ...
+```
+
+This single Protocol becomes the contract for your entire system. Any runtime environment must implement `TopLevelTools` to run the program—no guessing, no digging through code.
+
+### Building the Orchestrator
+
+The orchestrator composes submodules and routes between them. Rather than brittle string matching, we use a DSPy classifier to decide which submodule handles each query:
+
+```python
+from typing import Literal
+
+class RouterSignature(dspy.Signature):
+    """Route a user question to the appropriate specialist agent."""
+    question: str = dspy.InputField(desc="User's question")
+    route: Literal["search", "finance"] = dspy.OutputField(
+        desc="Which agent should handle this: 'search' for general queries, 'finance' for stock/market questions"
+    )
+
+class OrchestratorSignature(dspy.Signature):
+    question: str = dspy.InputField(desc="User's high-level question")
+    answer: str = dspy.OutputField(desc="Final orchestrated answer")
+
+class Orchestrator(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.router = dspy.Predict(RouterSignature)
+        self.search = SearchAgent()
+        self.finance = FinanceAgent()
+
+    def forward(self, question: str) -> dspy.Prediction:
+        route = self.router(question=question).route
+        
+        if route == "finance":
+            res = self.finance(question=question)
+            return dspy.Prediction(answer=res.answer)
+        else:
+            res = self.search(query=question)
+            return dspy.Prediction(answer=res.snippets)
+```
+
+The router is itself a trainable DSPy module—it will be optimized alongside the rest of the system during compilation. The orchestrator knows its external interface (the Signature), delegates to typed submodules, and inherits all tool requirements through the composed Protocol.
+
+## Training and Inference: Clean Separation
+
+This architecture enables a clean split between training and production. During training, you supply mock implementations:
+
+```python
+class MockEnv:
+    def web_search(self, query: str, top_k: int = 5):
+        return [f"Mock snippet for {query}"]
+
+    def stock_price(self, ticker: str) -> float:
+        return 123.45
+
+    def company_news(self, ticker: str):
+        return ["Mock news: strong earnings"]
+
+mock_env: TopLevelTools = MockEnv()
+
+with dspy.context(tool_registry=mock_env):
+    agent = Orchestrator()
+    optimizer = dspy.teleprompt.BootstrapFewShot(k=6)
+    compiled = optimizer.compile(agent, trainset)
+    compiled.save("./orchestrator", save_program=True)
+```
+
+The mock tools never get serialized into the artifact—only the compiled program is stored. At inference time, you swap in real implementations:
+
+```python
+class ProdEnv:
+    def web_search(self, query: str, top_k: int = 5):
+        return call_real_search_api(query, top_k)
+
+    def stock_price(self, ticker: str) -> float:
+        return fetch_live_price(ticker)
+
+    def company_news(self, ticker: str):
+        return fetch_news_feed(ticker)
+
+prod_env: TopLevelTools = ProdEnv()
+loaded = dspy.load("./orchestrator")
+
+with dspy.context(tool_registry=prod_env):
+    out = loaded(question="What is the price of AAPL and any news?")
+```
+
+Inference needs only three things: the compiled artifact, an environment implementing `TopLevelTools`, and the user's input.
+
+## Why Protocols Must Be Defined in the Program File
+
+There's a tempting but incorrect alternative: passing the Protocol as a constructor parameter. This breaks DSPy's compilation model in subtle ways.
+
+When you compile and save a DSPy program, you're serializing a *constructed instance*, not the class definition. When you load the artifact later, `__init__` is never called again—DSPy unpickles the already-assembled module. Any Protocol passed to the constructor at training time is frozen into the artifact and cannot be replaced at inference.
+
+More fundamentally, `InterfaceReAct.from_protocol()` uses the Protocol at construction time to inspect tool names, extract method signatures, build prompt templates, and configure the reasoning loop. All of this becomes part of the compiled program. If the Protocol could change at inference time, the compiled prompts would mismatch the runtime environment.
+
+The correct model is that the Protocol defines the program's *shape* and is fixed at compile time. Only *implementations* of that Protocol swap between environments. This is why the top-level Protocol belongs in the same source file as the agent definition—versioned together, frozen together, deployed together.
+
+## Benefits of This Approach
+
+This architecture delivers several concrete advantages. Contracts are explicit: every module declares its tool requirements in code. There are no string-based tool names to typo. Everything is fully typed, so your IDE provides autocomplete and your type checker catches mismatches. Modules remain self-contained and reusable since each knows its own Signature and Protocol. The top-level has a unified interface that tells implementers exactly what to provide.
+
+Training and inference are cleanly decoupled—only the tool registry changes between environments. Compiled artifacts contain no implementation code, keeping them portable. And the pattern works naturally with DSPy's optimization ecosystem: MIPRO, BootstrapFewShot, and multi-agent compositions all slot in without modification.
+
+## Conclusion
+
+The path to maintainable multi-module DSPy agents runs through explicit contracts. Put Signatures and Tool Protocols inside each module. Compose those Protocols into a single top-level interface. Let training and inference supply different implementations against that fixed interface. Keep your artifacts clean.
+
+The result is a system that's predictable, type-safe, and easy to reason about—exactly what you need when your agent architecture grows beyond a single module.
