@@ -3,20 +3,26 @@ layout: ../layouts/AboutLayout.astro
 title: "About"
 ---
 
-# About Me
+I'm a systems engineer turned indie builder, currently crafting consumer mobile apps and exploring what's possible at the edge of AI.
 
-Hi, I'm Your Name! 👋
+My career started at Microsoft, where I spent over a decade shipping software at scale. I worked on Windows USB drivers, then moved to Office 365 Security, and wrapped up my time there on Azure Cosmos DB. But my roots go deeper—back to UT Austin, where I studied Electrical Engineering. I distinctly remember a textbook, *Introduction to Computing Systems: From Bits & Gates to C & Beyond* by Patt and Patel, which showed me how electrons become software. That bottom-up mental model never left me.
 
-I'm a curious builder who loves turning ideas into working software. I spend my days exploring modern web tooling, learning in public, and documenting the messy middle between spark and shipping.
+From there, I went low: transistors, logic gates, OS internals, kernel debugging. Then I started climbing the stack—systems programming, platform work, eventually shipping products to millions. Microsoft was home for a long time.
 
-This blog is my home base for experiments, lessons learned, and the occasional deep dive into workflows that make creative work sustainable.
+Now I'm on my own. When GPT dropped, something clicked. I've been building at the intersection of mobile and AI ever since, trying to make things people actually want to use.
+
+## What I'm Building
+
+- [IngrediCheck](https://www.ingredicheck.app/) — Personalized Food Scanner App.
+- [KIN Calendar](https://www.kincalendar.com/) — A Delightful Family Calendar App.
 
 ## What I Write About
 
-- Practical web development tips
-- Product thinking & learning notes
-- Systems for focus and creativity
+- Mobile development and consumer app building
+- AI integration and practical LLM applications
+- Systems thinking from someone who started at the metal
+- Lessons from big tech, applied to indie building
 
 ## Get in Touch
 
-Always happy to connect—find me on [Twitter](https://twitter.com/YOUR_HANDLE) or send a quick [email](mailto:your@email.com).
+You can find me on [X](https://twitter.com/realsanketp).
