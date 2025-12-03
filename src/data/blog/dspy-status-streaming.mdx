@@ -75,6 +75,30 @@ async for item in streaming_agent(question="..."):
         print(item.answer)  # Final result
 ```
 
+## Multi-Module Pipelines
+
+For pipelines with multiple stages, use `instance` to identify which tool/module fired:
+
+```python
+class PipelineStatusProvider(dspy.streaming.StatusMessageProvider):
+    
+    def tool_start_status_message(self, instance, inputs):
+        tool_name = instance.name
+        if tool_name == "search_web":
+            return f"🔍 [Research] Searching: {inputs.get('query', '')[:40]}"
+        elif tool_name == "calculate":
+            return f"🧮 [Analysis] Computing: {inputs.get('expr', '')}"
+        return f"⚙️ Running {tool_name}..."
+    
+    def module_start_status_message(self, instance, inputs):
+        name = instance.__class__.__name__
+        if name == "ResearchModule":
+            return "📚 Starting research phase..."
+        elif name == "AnalysisModule":
+            return "📊 Starting analysis phase..."
+        return None  # Return None to skip status for this module
+```
+
 ## Server-Sent Events
 
 For web apps, wrap this in FastAPI and emit SSE:
