@@ -1,0 +1,117 @@
+---
+title: "DSPy Status Streaming"
+description: "Real-Time Tool Call Updates in DSPy with Status Streaming"
+pubDatetime: 2025-12-03T10:00:00Z
+modDatetime: 2025-12-03T10:00:00Z
+author: "Sanket Patel"
+featured: false
+draft: false
+tags:
+  - dspy
+  - architecture
+  - agents
+---
+
+# Real-Time Tool Call Updates in DSPy with Status Streaming
+
+Agents are getting more capable — and slower. A simple chatbot responds in 2 seconds. An agent that searches the web, queries databases, and synthesizes results? That's 15-30 seconds of dead air.
+
+Users don't mind waiting if they know something's happening. A UI pattern has emerged: show intermediate status updates while the agent works. You've seen this in ChatGPT ("Searching the web..."), Perplexity, and Claude's tool use. It turns an anxiety-inducing wait into something users can follow along with.
+
+Turns out, this is surprisingly easy to do with DSPy.
+
+## What It Looks Like
+
+A ReAct agent calling tools now shows:
+
+```
+🔍 Searching the web for: climate change...
+✅ Result: Climate change refers to long-term shifts...
+🌤️ Fetching weather for: Tokyo...
+✅ Result: Weather in Tokyo: 80°F, Sunny
+🤖 Thinking...
+```
+
+## How It Works
+
+DSPy's `streamify` accepts a `StatusMessageProvider` that hooks into tool and LM lifecycle events:
+
+```python
+import dspy
+
+class MyStatusProvider(dspy.streaming.StatusMessageProvider):
+    def tool_start_status_message(self, instance, inputs):
+        return f"🔍 Calling {instance.name}..."
+    
+    def tool_end_status_message(self, outputs):
+        return f"✅ Done: {str(outputs)[:50]}"
+    
+    def lm_start_status_message(self, instance, inputs):
+        return "🤖 Thinking..."
+```
+
+Available hooks:
+- `tool_start_status_message` / `tool_end_status_message`
+- `lm_start_status_message` / `lm_end_status_message`  
+- `module_start_status_message` / `module_end_status_message`
+
+## Wiring It Up
+
+```python
+# Create your agent
+react = dspy.ReAct("question -> answer", tools=[...])
+
+# Wrap with streaming + status provider
+streaming_agent = dspy.streamify(
+    react,
+    status_message_provider=MyStatusProvider(),
+)
+
+# Consume the stream
+async for item in streaming_agent(question="..."):
+    if isinstance(item, dspy.streaming.StatusMessage):
+        print(item.message)  # Tool/LM status updates
+    elif isinstance(item, dspy.Prediction):
+        print(item.answer)  # Final result
+```
+
+## Server-Sent Events
+
+For web apps, wrap this in FastAPI and emit SSE:
+
+```python
+@app.post("/v1/query")
+async def query_stream(q: Query):
+    async def generate():
+        async for item in streaming_agent(question=q.text):
+            if isinstance(item, dspy.streaming.StatusMessage):
+                yield f"data: {json.dumps({'type': 'status', 'msg': item.message})}\n\n"
+            elif isinstance(item, dspy.Prediction):
+                yield f"data: {json.dumps({'type': 'result', 'answer': item.answer})}\n\n"
+        yield "data: [DONE]\n\n"
+    
+    return StreamingResponse(generate(), media_type="text/event-stream")
+```
+
+## Full Demo
+
+I put together a self-contained script that spins up a FastAPI server with a ReAct agent, runs a demo query with status streaming, and cleans up:
+
+**[GitHub Gist: dspy_streaming_demo.py](https://gist.github.com/justanotheratom/372c8248a17ad97ca18b2dcc0ac0ceef)**
+
+Setup:
+```bash
+    export OPENAI_API_KEY="sk-your-key"
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python3 -m pip install fastapi uvicorn httpx dspy
+```
+
+Run:
+```bash
+    python3 dspy_status_streaming.py
+    # OR
+    python3 dspy_status_streaming.py "Your custom question here"
+```
+
+Status streaming turns a black-box agent into something users can actually follow. Small addition, big UX win.

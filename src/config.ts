@@ -1,5 +1,5 @@
 export const SITE = {
-  website: "https://example.com/", // update after connecting your domain
+  website: "https://www.elicited.blog/",
   author: "Your Name",
   profile: "https://example.com/",
   desc: "A personal blog about engineering, learning, and creativity.",
