@@ -1,0 +1,265 @@
+---
+title: "Non-Obvious Things I Learned About GEPA"
+description: "I failed at GEPA, then learned a few things."
+pubDatetime: 2025-12-08T10:00:00Z
+modDatetime: 2025-12-08T10:00:00Z
+author: "Sanket Patel"
+featured: false
+draft: false
+tags:
+  - gepa
+  - dspy
+---
+
+# I failed at GEPA, then leaned a few things.
+
+*AI-generated entry. See [What & Why](/posts/what-and-why) for context.*
+
+---
+
+Without knowing much, I ran GEPA on a DSPy program, and blew $20. Results were underwhelming. So I dug into the source to understand what was happening under the hood.
+
+This isn't a comprehensive guide to GEPA. It's the collection of "oh, *that's* how it works" moments I had while reading through the implementation. The stuff that wasn't obvious from the docs or API surface.
+
+## Quick Primer on GEPA
+
+GEPA (Genetic-Pareto) is a reflective optimizer. It evolves prompts by having an LLM critique failures and propose improvements. The "Pareto" in the name doesn't mean multi-objective optimization. It means the algorithm keeps candidates that are best on *any* validation example, not just the best on average.
+
+That distinction matters.
+
+## The Core Loop
+
+GEPA tracks two collections throughout optimization:
+
+| Collection | Contents |
+|------------|----------|
+| **Candidate Pool** | Append-only list of all programs tried. Index 0 is your baseline. |
+| **Pareto Frontiers** | One set per validation example, storing indices of candidates tied for best on that example. |
+
+The simplified flow:
+
+```
+1. Initialize:
+   - Candidate pool = [baseline program #0]
+   - Frontiers = {0} for each validation example
+
+2. Loop until budget exhausted:
+   - Pick a parent from frontiers (weighted by coverage)
+   - Sample a mini-batch from trainset
+   - Run parent on mini-batch, collect traces
+   - LLM reflects on failures, proposes new instruction
+   - Create child candidate with new instruction
+   - If child beats parent on mini-batch → evaluate on full valset
+   - Update frontiers, append child to pool
+   - Optionally attempt merge
+
+3. Return candidate with highest average score on valset
+```
+
+Simple enough. But the details hide surprises.
+
+## One Frontier Per Validation Example
+
+Traditional multi-objective Pareto optimization deals with competing objectives: accuracy vs. latency vs. cost. You can't maximize all three, so you keep solutions representing different trade-offs.
+
+GEPA's "Pareto" is different. There's only one objective: your metric score. But GEPA treats each validation example as if it were its own dimension. A candidate that scores best on val_0 survives, even if it's mediocre on val_1 through val_99. The "front" isn't about trade-offs between competing goals. It's about preserving candidates that excel somewhere, anywhere.
+
+GEPA maintains N frontiers, one for each validation example. Each frontier stores the indices of candidates that are tied for best on that specific example.
+
+```
+val_0: {5, 9}      # candidates 5 and 9 both score best on val example 0
+val_1: {10, 14}    # candidates 10 and 14 both score best on val example 1
+val_2: {15}        # candidate 15 alone scores best on val example 2
+...
+```
+
+Why does this matter? A candidate that's mediocre on average but crushes one specific example stays in the pool. It can be selected as a parent and drive exploration in directions a generalist would miss.
+
+## Parents Are Weighted by Frontier Coverage
+
+When selecting a parent for mutation, GEPA doesn't pick uniformly. Candidates that appear in more frontiers get proportionally higher selection probability.
+
+A generalist that scores well across many examples gets picked more often. But a specialist that dominates one example still gets picked sometimes. The algorithm balances exploitation (generalists) with exploration (specialists).
+
+## Mini-Batch Training, Full Validation
+
+New candidates don't run against the entire trainset. They run against a small mini-batch sampled each iteration.
+
+| Phase | Dataset | Purpose |
+|-------|---------|---------|
+| Reflection | Train mini-batch | Generate failure traces, propose improvements |
+| Accept gate | Train mini-batch | Child must beat parent here to proceed |
+| Full eval | Entire valset | Update frontiers, track scores |
+
+This is an efficiency trade-off. You explore more candidates by not exhaustively testing each one. But it also means a candidate might look good on its mini-batch and fail elsewhere.
+
+## Budget = Total Metric Calls
+
+Your budget isn't "number of iterations" or "number of candidates." It's total metric calls, training and validation combined.
+
+So **smaller valsets let you explore more.**
+
+If your valset has 100 examples and you accept 10 candidates, that's 1,000 metric calls just for validation. With a 20-example valset, same scenario costs 200 calls. The savings go toward trying more candidates.
+
+GEPA logs even mention this: consider smaller valsets if you want broader exploration.
+
+## Valset Composition Matters More Than Size
+
+Your valset should represent the diversity of your inputs as compactly as possible.
+
+Size gets all the attention because of budget, but composition affects something deeper: what GEPA is actually optimizing for.
+
+Remember, each val example creates a frontier. Each frontier is a survival niche for specialists. If your 20 val examples are genuinely diverse, you're preserving specialists for 20 different challenges. Their mutations explore 20 different directions. The generalist that eventually emerges has been pressure-tested against all of them.
+
+But if 15 of your 20 examples test the same pattern, you've collapsed 15 frontiers into one. Your specialists all specialize in the same thing. Your exploration concentrates in one corner of instruction-space. And at final selection, 75% of the average score comes from that one pattern.
+
+The candidate you pick looks great on your valset. But it's not actually the best generalist. It's a specialist for your overrepresented pattern, with a small penalty for ignoring everything else. Deploy it on genuinely diverse production inputs and it may fail on patterns that never influenced selection.
+
+This happens regardless of budget. Infinite budget means you explore more candidates, but your selection criterion is still skewed. You're searching harder for the wrong thing.
+
+So when building your valset: cover the patterns that matter, avoid redundancy, and keep it compact enough to leave budget for exploration. Each example should earn its spot by representing something distinct.
+
+## Multi-Objective? Bake It Into Your Metric
+
+GEPA's "Pareto" is per-example, not per-objective. If you care about accuracy vs. latency vs. token cost as competing goals, GEPA doesn't maintain trade-off frontiers for those. It just sees whatever single score your metric returns.
+
+So if you want multi-objective optimization, you have to bake it into the metric yourself.
+
+**Weighted composite score:**
+
+```python
+def metric(gold, pred, trace=None, **kwargs):
+    accuracy = compute_accuracy(gold, pred)
+    latency = measure_latency(trace)   # lower is better
+    tokens = count_tokens(trace)       # lower is better
+    
+    # Normalize and combine
+    score = (
+        0.6 * accuracy 
+        - 0.2 * (latency / max_latency) 
+        - 0.2 * (tokens / max_tokens)
+    )
+    
+    feedback = f"Accuracy: {accuracy}, Latency: {latency}ms, Tokens: {tokens}"
+    return dspy.Prediction(score=score, feedback=feedback)
+```
+
+The weights encode your trade-off preferences. GEPA optimizes this single number.
+
+**Threshold-gated scoring:**
+
+```python
+def metric(gold, pred, trace=None, **kwargs):
+    accuracy = compute_accuracy(gold, pred)
+    latency = measure_latency(trace)
+    
+    # Only reward accuracy if latency is acceptable
+    if latency > 500:  # ms threshold
+        score = 0
+        feedback = f"Too slow ({latency}ms). Accuracy irrelevant if latency exceeds 500ms."
+    else:
+        score = accuracy
+        feedback = f"Accuracy: {accuracy}, Latency: {latency}ms (within budget)"
+    
+    return dspy.Prediction(score=score, feedback=feedback)
+```
+
+This makes latency a hard constraint rather than a soft trade-off.
+
+**The feedback matters here too.** Even though GEPA only optimizes the scalar score, the reflection LLM reads your feedback text. If you explain *why* a candidate scored poorly ("too many tokens", "latency exceeded budget"), the reflection can propose targeted improvements. A metric that just returns `0.7` gives less signal than one that returns `0.7` with "accuracy good but 3x over token budget."
+
+Your metric function is doing double duty. The score defines what GEPA selects for. The feedback teaches the reflection LLM what to fix. Design both carefully.
+
+## Merge Is Deterministic (No LLM)
+
+For multi-predictor programs, GEPA can merge two candidates by recombining their predictor instructions. I expected this to involve LLM synthesis, asking the model to blend two instructions into one.
+
+Turns out merge is purely deterministic.
+
+It works like this:
+
+1. Find two candidates (A and B) that descend from a common ancestor
+2. Check if they share enough validation examples in their frontiers (default: 5)
+3. For each predictor, swap text from A and B based on ancestry
+4. Evaluate the merged candidate on valset
+5. Add to pool if it improves
+
+**For multi-predictor programs**, merge can recombine the best parts of specialized candidates. Predictor 1's instruction from candidate A, predictor 2's from candidate B. This is where GEPA's genetic metaphor actually holds. You're combining traits from two parents.
+
+**For single-predictor programs**, merge provides no benefit. There's only one instruction to swap, so "recombination" just means picking one parent's instruction over the other. The overlap gate often blocks it anyway. If you're optimizing a single `ChainOfThought`, set `use_merge=False` and save yourself some budget.
+
+## The Proposer Prompt Is Swappable
+
+I didn't expect this. GEPA uses a "proposer prompt" to guide how the reflection LLM generates new instructions. And you can swap it out.
+
+The default proposer analyzes execution traces and failures, then proposes improved instructions. But GEPA ships with alternatives for different scenarios. The one that caught my eye: `MultiModalInstructionProposer`.
+
+If your DSPy program takes image inputs, the default proposer doesn't know how to reason about visual content in the traces. `MultiModalInstructionProposer` is designed for exactly this case. It understands that some of your inputs are images and adjusts its reflection accordingly.
+
+I didn't realize this was configurable until I hit a wall optimizing a vision pipeline. The default proposer kept suggesting text-focused improvements that missed the point entirely. Switching to the multimodal proposer made the reflection actually useful.
+
+Check the `instruction_proposer` parameter if your program handles images, audio, or other non-text modalities.
+
+## Specialists vs. Generalists
+
+This one clicked for me.
+
+**During optimization:** Specialists survive. A candidate that's best on even one validation example stays in the pool and can be selected as a parent.
+
+**At selection time:** The generalist wins. GEPA returns the candidate with the highest *average* score across all validation examples.
+
+The specialists aren't wasted. They explore regions of instruction-space that generalists wouldn't reach. Their mutations might produce the next generalist. But they won't be your final output unless they happen to also have the best average.
+
+## Frontier Dynamics
+
+Frontiers aren't static. They evolve:
+
+- **Tie with best score:** Candidate index gets *added* to that example's frontier
+- **Beat best score:** Frontier gets *replaced*. All previous indices removed, only new winner remains
+
+On breakthroughs, frontiers shrink. A candidate that beats the previous best on an example wipes out all the tied specialists. The pool keeps growing (append-only), but the frontiers concentrate around new peaks.
+
+## Quick Reference
+
+| Concept | What It Means |
+|---------|--------------|
+| Frontier | Set of candidate indices tied for best on one val example |
+| Parent selection | Weighted by how many frontiers a candidate appears in |
+| Mini-batch | Small sample from trainset for reflection and accept gate |
+| Full eval | Run on entire valset only for accepted candidates |
+| Budget | Total metric calls (train + val) |
+| Merge | Deterministic recombination, no LLM, overlap-gated |
+| Proposer | Swappable prompt that guides reflection; use `MultiModalInstructionProposer` for vision |
+| Valset composition | Diversity affects exploration and selection quality, not just budget |
+| Multi-objective | Not built-in; bake competing goals into your metric's score and feedback |
+
+## What I'd Do Differently
+
+Armed with this understanding:
+
+1. **Curate your valset for diversity, not just size.** Cover the patterns that matter, avoid redundancy. Each example should earn its spot.
+2. **Watch the logs.** GEPA prints frontier updates. You can see specialists emerge and get dethroned.
+3. **Disable merge for single-predictor programs.** Set `use_merge=False`. It won't help and just burns budget.
+4. **Run longer than you think.** The specialist→generalist pipeline takes iterations (more on this below).
+
+### Why Patience Matters
+
+Think about what happens over iterations. Early on, your baseline is the only candidate. It gets mutated. The child might improve on some examples but regress on others. If it's best on even one example, it survives. Now you have a specialist.
+
+Middle iterations: you've accumulated several specialists. Candidate A crushes val_3, candidate B crushes val_7. When these specialists get selected as parents and mutated, some mutations inherit their strengths while accidentally picking up broader applicability.
+
+Later iterations: some mutations of specialists turn out to be generalists. They don't just win val_3. They're competitive across many examples. These start dominating the frontiers (remember: parent selection is weighted by frontier coverage).
+
+Final selection picks the candidate with best *average* score. Early stopping might catch you when you only have specialists. The generalists emerge from specialists, but that emergence takes time. It's evolution: narrow specialists first, then some generalists emerge that thrive across environments.
+
+GEPA is smarter than a simple genetic algorithm. The per-example frontiers preserve diversity. The weighted selection balances exploration and exploitation. The mini-batch approach trades thoroughness for coverage.
+
+But it's also opinionated. Small valsets, multi-predictor programs, and patience let it shine. Miss those conditions and you get what I got on my first run: underwhelming results and a deep dive into source code.
+
+---
+
+*Source code references for verification:*
+- Per-val frontiers: `src/gepa/core/state.py`
+- Parent selection: `src/gepa/strategies/candidate_selector.py`
+- Reflective mutation: `src/gepa/proposer/reflective_mutation/reflective_mutation.py`
+- Merge: `src/gepa/proposer/merge.py`
