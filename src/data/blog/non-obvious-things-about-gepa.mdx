@@ -2,7 +2,7 @@
 title: "Non-Obvious Things I Learned About GEPA"
 description: "I failed at GEPA, then learned a few things."
 pubDatetime: 2025-12-08T10:00:00Z
-modDatetime: 2025-12-08T10:00:00Z
+modDatetime: 2025-12-09T10:00:00Z
 author: "Sanket Patel"
 featured: false
 draft: false
@@ -170,6 +170,8 @@ This makes latency a hard constraint rather than a soft trade-off.
 
 Your metric function is doing double duty. The score defines what GEPA selects for. The feedback teaches the reflection LLM what to fix. Design both carefully.
 
+The GEPA maintainers are also adding native support for objective and hybrid multi-data Pareto frontier tracking (see PR #92), so true multi-objective workflows may not require hand-crafted composite metrics.[^lakshya-feedback]
+
 ## Merge Is Deterministic (No LLM)
 
 For multi-predictor programs, GEPA can merge two candidates by recombining their predictor instructions. I expected this to involve LLM synthesis, asking the model to blend two instructions into one.
@@ -186,7 +188,7 @@ It works like this:
 
 **For multi-predictor programs**, merge can recombine the best parts of specialized candidates. Predictor 1's instruction from candidate A, predictor 2's from candidate B. This is where GEPA's genetic metaphor actually holds. You're combining traits from two parents.
 
-**For single-predictor programs**, merge provides no benefit. There's only one instruction to swap, so "recombination" just means picking one parent's instruction over the other. The overlap gate often blocks it anyway. If you're optimizing a single `ChainOfThought`, set `use_merge=False` and save yourself some budget.
+**For single-predictor programs**, use_merge is a no-op.
 
 ## The Proposer Prompt Is Swappable
 
@@ -228,7 +230,7 @@ On breakthroughs, frontiers shrink. A candidate that beats the previous best on 
 | Mini-batch | Small sample from trainset for reflection and accept gate |
 | Full eval | Run on entire valset only for accepted candidates |
 | Budget | Total metric calls (train + val) |
-| Merge | Deterministic recombination, no LLM, overlap-gated |
+| Merge | Deterministic recombination, no LLM, overlap-gated; single-predictor programs act the same with or without it |
 | Proposer | Swappable prompt that guides reflection; use `MultiModalInstructionProposer` for vision |
 | Valset composition | Diversity affects exploration and selection quality, not just budget |
 | Multi-objective | Not built-in; bake competing goals into your metric's score and feedback |
@@ -239,7 +241,7 @@ Armed with this understanding:
 
 1. **Curate your valset for diversity, not just size.** Cover the patterns that matter, avoid redundancy. Each example should earn its spot.
 2. **Watch the logs.** GEPA prints frontier updates. You can see specialists emerge and get dethroned.
-3. **Disable merge for single-predictor programs.** Set `use_merge=False`. It won't help and just burns budget.
+3. **Disable merge for single-predictor programs.** Set `use_merge=False`. It won't help and just burns budget (though leaving it enabled doesn't change behavior).
 4. **Run longer than you think.** The specialist→generalist pipeline takes iterations (more on this below).
 
 ### Why Patience Matters
@@ -263,3 +265,5 @@ But it's also opinionated. Small valsets, multi-predictor programs, and patience
 - Parent selection: `src/gepa/strategies/candidate_selector.py`
 - Reflective mutation: `src/gepa/proposer/reflective_mutation/reflective_mutation.py`
 - Merge: `src/gepa/proposer/merge.py`
+
+[^lakshya-feedback]: Clarifications courtesy of GEPA co-author Lakshya A. Agrawal responding to this post.[https://t.co/zstmiOQZ5L](https://t.co/zstmiOQZ5L)
