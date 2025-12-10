@@ -1,0 +1,178 @@
+---
+title: "DSPy: Track Token Usage per-Module"
+description: "Getting granular token usage from nested DSPy modules"
+pubDatetime: 2025-12-10T10:00:00Z
+modDatetime: 2025-12-10T10:00:00Z
+author: "Sanket Patel"
+featured: false
+draft: false
+tags:
+  - gepa
+  - dspy
+  - agents
+---
+
+*AI-generated entry. See [What & Why](/posts/what-and-why) for context.*
+
+# Getting granular token usage from nested DSPy modules
+
+DSPy's built-in usage tracking gives you aggregate token counts after a program runs. That's fine for simple pipelines. But when you're debugging cost or optimizing a multi-module agent, you need to know which predictor ate your budget.
+
+## The Limitation
+
+DSPy added usage tracking in version 2.6.16. Enable it with:
+
+```python
+dspy.configure(track_usage=True)
+```
+
+Then pull totals from any prediction:
+
+```python
+result = program(question="What is the capital of France?")
+print(result.get_lm_usage())
+```
+
+You get something like:
+
+```python
+{
+    'openai/gpt-4o-mini': {
+        'completion_tokens': 245,
+        'prompt_tokens': 1120,
+        'total_tokens': 1365
+    }
+}
+```
+
+This is the sum across all LM calls in your program. If your program has three sub-modules, each calling the LM, you have no idea how those 1,365 tokens break down.
+
+For a flat program with one predictor, that's fine. For a nested agent with branching logic, parallel calls, and tool use, it's not enough.
+
+## Why Per-Predictor Usage Matters
+
+Consider a multi-hop research agent:
+
+```python
+class ResearchAgent(dspy.Module):
+    def __init__(self):
+        self.planner = dspy.ChainOfThought("question -> plan")
+        self.searcher = dspy.ReAct("plan -> findings", tools=[search])
+        self.synthesizer = dspy.ChainOfThought("findings -> answer")
+        self.critic = dspy.ChainOfThought("answer -> critique")
+```
+
+When this runs, you might see 8,000 total tokens. But which module is the problem? Is the planner generating verbose plans? Is the searcher doing too many tool calls? Is the critic just rubber-stamping everything in two tokens?
+
+Without per-predictor breakdowns, you're guessing. With them, you can target your optimization.
+
+## The Solution: Callback-Based Tracking
+
+DSPy's callback system hooks into module lifecycle events. We can snapshot usage before and after each module call, then compute the delta.
+
+The key insight: `dspy.settings.usage_tracker.get_total_tokens()` returns cumulative usage. By capturing it at module start and end, we isolate each module's contribution.
+
+Here's the core approach:
+
+```python
+from dspy.utils.callback import BaseCallback
+from collections import defaultdict
+
+class PerModuleUsageTracker(BaseCallback):
+    def __init__(self, top_level_module=None):
+        self.module_usage = defaultdict(dict)
+        self.module_trackers = {}
+        self.top_level_module = top_level_module
+    
+    def on_module_start(self, call_id, instance, inputs):
+        module_path = self._build_module_path(instance)
+        if module_path is None:
+            return
+        initial_usage = self._get_usage_snapshot()
+        self.module_trackers[call_id] = (module_path, initial_usage)
+    
+    def on_module_end(self, call_id, outputs, exception=None):
+        if call_id not in self.module_trackers:
+            return
+        module_path, initial_usage = self.module_trackers.pop(call_id)
+        final_usage = self._get_usage_snapshot()
+        module_usage = self._calculate_usage_diff(initial_usage, final_usage)
+        # Store or accumulate usage for this module path
+        ...
+```
+
+The tricky part is building meaningful module paths. DSPy tracks the call stack in `dspy.settings.caller_modules`. We walk this stack to construct paths like `ResearchAgent.searcher` or `ResearchAgent.nested.inner`.
+
+## Wiring It Up
+
+Register the tracker as a callback when configuring DSPy:
+
+```python
+program = ResearchAgent()
+tracker = PerModuleUsageTracker(top_level_module=program)
+
+dspy.configure(
+    lm=dspy.LM("openai/gpt-4o-mini", cache=False),
+    track_usage=True,
+    callbacks=[tracker]
+)
+
+result = program(question="What caused the 2008 financial crisis?")
+```
+
+After execution, pull the breakdown:
+
+```python
+usage = tracker.get_module_usage()
+```
+
+You get a dict mapping module paths to their individual usage:
+
+```
+Module                              | Input | Output | Total
+-----------------------------------------------------------------
+ResearchAgent.planner               |   234 |     89 |   323
+ResearchAgent.searcher              |  1456 |    412 |  1868
+ResearchAgent.synthesizer           |   567 |    156 |   723
+ResearchAgent.critic                |   189 |     34 |   223
+```
+
+Now you know the searcher is eating 60% of your tokens. Maybe it's time to tune its instructions or limit tool iterations.
+
+## Edge Cases
+
+A few things the tracker handles:
+
+**Nested modules**: If `searcher` contains its own sub-modules, their usage rolls up correctly. The path reflects the nesting: `ResearchAgent.searcher.inner`.
+
+**Skipping internal predictors**: Every `ChainOfThought` wraps a `Predict`. We skip tracking raw `Predict` instances since they're implementation details. You see `planner`, not `planner.predict`.
+
+**Container modules without predictors**: Some modules just orchestrate others. If a module has no direct predictors, we skip it to avoid noise.
+
+**Multiple calls**: If a module is called twice (say, in a loop), usage accumulates under the same path.
+
+## Limitations
+
+This approach tracks usage per module instance path, not per individual LM call. If a single module makes multiple LM calls internally (like `ReAct` iterating through tool use), you see their sum.
+
+For finer granularity, you'd need to hook into the LM call layer directly. That's possible but requires more invasive changes.
+
+Also, the path-building logic relies on `caller_modules` being accurate. In async or parallel execution, make sure DSPy's context propagation is working correctly.
+
+## Full Demo
+
+I put together a self-contained script with the complete tracker implementation and a nested module example:
+
+**[GitHub Gist: per_module_usage_tracker.py](https://gist.github.com/justanotheratom/20893a4c04eddb47612247ea4e343c25)**
+
+Run it with:
+
+```bash
+export OPENAI_API_KEY="your-key"
+pip install dspy
+python per_module_usage_tracker.py
+```
+
+Output shows a table of per-module token usage after running a three-predictor program.
+
+The tracker is generic. Drop it into any multi-module DSPy program to see where your tokens go.
