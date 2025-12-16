@@ -1,0 +1,238 @@
+---
+title: "Strategy and Program: Two Concepts for working with DSPy"
+description: "Introducing two Nouns that make working with DSPy clearer."
+pubDatetime: 2025-12-16T10:00:00Z
+modDatetime: 2025-12-16T10:00:00Z
+author: "Sanket Patel"
+featured: false
+draft: false
+tags:
+  - dspy
+  - architecture
+---
+
+# Introducing two Nouns that make working with DSPy clearer.
+
+*AI-generated entry. See [What & Why](/posts/what-and-why) for context.*
+
+---
+
+DSPy has modules, predictors, optimizers, signatures... the vocabulary can blur together. I kept finding myself wanting clearer terms for two specific things:
+
+1. **What do I call ChainOfThought, ReAct, BestOfN?** They're not optimizers. They're not plain modules. They do something specific: augment how predictions happen at runtime.
+
+2. **What's the thing I pass to `compile()`?** It's a module, sure. But it's the *top-level* module, the unit of optimization. That feels distinct.
+
+I've started using two terms that help me think about this: **Strategy** and **Program**.
+
+These aren't official DSPy vocabulary. They're mental models I find useful. Maybe you will too.
+
+## Background: The Existing Concepts
+
+Quick recap of the DSPy concepts you already know:
+
+**Signature** — Declares what a module does (inputs → outputs)
+```python
+"question -> answer"
+# or class-based with descriptions
+```
+
+**Predict** — The atomic unit that makes ONE LM call
+```python
+predict = dspy.Predict("question -> answer")
+```
+
+**Module** — Base class for composing DSPy components
+```python
+class MyModule(dspy.Module):
+    def forward(self, question):
+        ...
+```
+
+**Optimizer** — Tunes prompts/demos at compile-time (used to be called Teleprompters)
+```python
+optimizer.compile(module, trainset=data)
+```
+
+Now for the two concepts I'm introducing.
+
+---
+
+## Introducing: Strategy
+
+**What I mean by "Strategy":** A module that augments how `Predict` runs at runtime.
+
+DSPy ships with ChainOfThought, ReAct, BestOfN, and several others. But what *are* these things? They're not optimizers — they don't tune anything. They're not plain modules — they specifically change how LM calls happen.
+
+I call them **strategies**: runtime techniques for improving LM responses.
+
+Most strategies are built-in, but you can write your own.
+
+### Strategy vs. Optimizer
+
+Both strategies and optimizers exist to improve LM output. The difference is *when* they operate:
+
+| | Strategy | Optimizer |
+|--|----------|-----------|
+| **When** | Runtime (during `forward()`) | Compile-time (during `compile()`) |
+| **How** | Changes how LM is called | Tunes prompts/demos/weights |
+| **Example** | ChainOfThought adds reasoning | MIPROv2 optimizes instructions |
+
+A strategy changes the *mechanics* of prediction. An optimizer changes the *content* of prompts.
+
+### Complete List of Strategies
+
+| Strategy | What It Does |
+|----------|--------------|
+| **ChainOfThought** | Adds reasoning step before prediction |
+| **ReAct** | Iterative reasoning + tool usage |
+| **ProgramOfThought** | Generates and executes Python code |
+| **CodeAct** | Code generation with tool calling |
+| **BestOfN** | Run N times, return best by reward |
+| **Refine** | Run N times with iterative feedback |
+| **MultiChainComparison** | Compare M reasoning attempts |
+| **Avatar** | Dynamic agent with tool selection |
+
+### Code Example
+
+```python
+# Strategy = runtime augmentation of Predict
+cot = dspy.ChainOfThought("question -> answer")
+# At runtime: adds reasoning field, asks LM to think step-by-step
+
+react = dspy.ReAct("question -> answer", tools=[search])
+# At runtime: loops through thought → action → observation
+```
+
+The strategy doesn't change your prompts ahead of time. It changes what happens when you call `forward()`.
+
+---
+
+## Introducing: Program
+
+**What I mean by "Program":** Any module that gets passed to an optimizer's `compile()`. It's the top-level module being optimized.
+
+In DSPy, you might have nested modules — modules containing modules containing Predicts. When you optimize, which one is "the program"? The one you pass to `compile()`. That's the program.
+
+### Why This Term Helps
+
+**Coordinated optimization:** When you optimize a program, ALL predictors within it get optimized together. The optimizer walks through `named_predictors()` and tunes them as a coordinated whole. It doesn't matter how deeply nested your Predicts are. If they're inside the module you pass to `compile()`, they get tuned.
+
+**Boundary between AI and non-AI code:** The program marks where your deterministic code ends and your AI code begins. This boundary matters because:
+
+- The program is **stateless**. It takes inputs, returns outputs, no side effects. (The tools you pass to a program may be stateful—databases, APIs, external services—but the program itself remains stateless.)
+- The program's **code shouldn't change much over time**. What changes is the training data and hyperparameters you pass to `compile()`.
+- Your non-AI code (API routes, data pipelines, UI) calls the program as a black box.
+
+**Compile once, deploy anywhere:** A compiled program can be exported (saved) and imported at runtime for inference. You don't re-run the optimizer in production. You load the already-optimized program and call it.
+
+**A/B testing:** Different compiled versions of the same program—trained on different data, with different hyperparameters, or different optimizers—can be deployed side by side. Same code, different compilations. This makes experimentation clean.
+
+This mental model keeps things organized. Define a program, optimize it, export it, deploy it as a unit.
+
+### Program vs. Module vs. Strategy
+
+| | Module | Strategy | Program |
+|--|--------|----------|---------|
+| **What** | Base class | Runtime augmentation | Top-level module being optimized |
+| **Role** | Building block | Improves LM responses at runtime | Unit of optimization |
+
+A module is the building block. A strategy is a specific kind of module that augments prediction. A program is whatever module you hand to the optimizer.
+
+### Three Examples of Programs
+
+**Example 1: Direct call to Predict or a built-in strategy**
+
+```python
+# A single Predict is a program when optimized
+program = dspy.Predict("question -> answer")
+optimized = optimizer.compile(program, trainset=data)
+
+# A single strategy is also a program when optimized
+program = dspy.ChainOfThought("question -> answer")
+optimized = optimizer.compile(program, trainset=data)
+```
+
+**Example 2: A module that calls Predict or a built-in strategy**
+
+```python
+class QA(dspy.Module):
+    def __init__(self):
+        self.answer = dspy.ChainOfThought("question -> answer")
+
+    def forward(self, question):
+        return self.answer(question=question)
+
+program = QA()
+optimized = optimizer.compile(program, trainset=data)
+```
+
+**Example 3: A module that has other modules**
+
+```python
+class MultiHop(dspy.Module):
+    def __init__(self):
+        self.hop1 = HopModule()  # Another module
+        self.hop2 = HopModule()  # Another module
+        self.final = dspy.Predict("context -> answer")
+
+    def forward(self, question):
+        context = self.hop1(question=question)
+        context = self.hop2(question=question, context=context)
+        return self.final(context=context)
+
+program = MultiHop()
+optimized = optimizer.compile(program, trainset=data)
+# All predictors across all nested modules get tuned together
+```
+
+---
+
+## Putting It Together
+
+Here's the mental model:
+
+```
+┌───────────────────────────────────────────────┐
+│                   PROGRAM                     │
+│       (top-level, unit of optimization)       │
+│                                               │
+│   ┌─────────────┐     ┌─────────────┐         │
+│   │  Strategy   │     │  Strategy   │         │
+│   │  (CoT)      │ --> │  (Predict)  │         │
+│   │             │     │             │         │
+│   │  [Predict]  │     │             │         │
+│   └─────────────┘     └─────────────┘         │
+└───────────────────────────────────────────────┘
+                      │
+                      │ compile()
+                      ▼
+              ┌──────────────┐
+              │  Optimizer   │
+              │  (MIPROv2)   │
+              └──────────────┘
+```
+
+The workflow:
+
+1. Build your program using strategies (ChainOfThought, ReAct, etc.)
+2. Pass the program to an optimizer
+3. All predictors within get tuned together
+4. Deploy the optimized program
+
+Strategies and optimizers aren't competing approaches. They're complementary. Pick your runtime behavior with strategies. Tune that behavior for your domain with optimizers.
+
+---
+
+## Summary
+
+| Concept | What It Is | My Term? |
+|---------|------------|----------|
+| Signature | Input/output declaration | Existing |
+| Predict | Atomic LM call | Existing |
+| Module | Base class for composition | Existing |
+| Optimizer | Compile-time tuning | Existing |
+| **Strategy** | Module that augments Predict at runtime | **Introduced** |
+| **Program** | Top-level module being optimized | **Introduced** |
+
+I find these terms useful for keeping straight what operates when. Maybe DSPy will adopt them officially someday. For now, they're just how I think about it.
