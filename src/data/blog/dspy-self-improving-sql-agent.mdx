@@ -1,0 +1,491 @@
+---
+title: "Self-Improving SQL Agent with Pure DSPy"
+description: "Building a Text-to-SQL agent that learns from successful queries using DSPy's ReAct pattern and Retriever Model"
+pubDatetime: 2025-12-16T10:00:00Z
+modDatetime: 2025-12-16T10:00:00Z
+author: "Sanket Patel"
+featured: false
+draft: true
+tags:
+  - dspy
+  - agents
+  - sql
+  - architecture
+---
+
+*AI-generated entry. See [What & Why](/posts/what-and-why) for context.*
+
+# Building a Self-Improving SQL Agent with Pure DSPy
+
+Ashpreet Bedi recently wrote about building a [self-improving Text-to-SQL agent](https://www.ashpreetbedi.com/articles/sql-agent) using the Agno framework. The core idea: an agent that not only translates natural language to SQL, but also stores successful queries for future reference. Over time, the agent builds a knowledge base of working queries it can retrieve and adapt.
+
+This post shows how to build the same thing using pure DSPy. No external orchestration framework, no separate vector database service. Just DSPy's built-in patterns: `ReAct` for agent logic, and `Retrieve` + `Embeddings` for the knowledge base.
+
+## Why DSPy?
+
+[Agno](https://github.com/agno-agi/agno) is a unified stack for multi-agent systems—framework, runtime, and control plane in one. It's fast (529x faster agent instantiation than LangGraph), includes memory and knowledge management, guardrails, human-in-the-loop, and AgentOS for production deployments. It's a serious framework with 36k GitHub stars.
+
+But Agno is a different abstraction level. It orchestrates agents. DSPy *programs* them.
+
+DSPy's value proposition is different:
+
+- **`dspy.ReAct`** handles the agent loop (think, act, observe, repeat)
+- **`dspy.Retrieve`** handles knowledge base lookups as a first-class concept
+- **`dspy.configure(lm=..., rm=...)`** configures both language and retrieval models together
+- **`optimizer.compile()`** can tune prompts and demonstrations on your data
+
+The key difference: DSPy treats the agent as an optimizable program. You write the logic, DSPy finds the prompts that make it work well on your domain. Agno gives you production infrastructure; DSPy gives you a programming model for LLM behavior.
+
+## The Architecture
+
+```
+User Question
+      │
+      ▼
+┌─────────────────────────────────┐
+│         dspy.ReAct              │
+│  ┌─────────────────────────┐    │
+│  │  Think → Act → Observe  │◄───┼──── Tools:
+│  │         (loop)          │    │     - get_schema()
+│  └─────────────────────────┘    │     - execute_query()
+│              │                  │     - search_knowledge_base()
+│              ▼                  │     - store_successful_query()
+│         Final Answer            │
+└─────────────────────────────────┘
+      │
+      ▼
+  Knowledge Base (dspy.Retrieve)
+```
+
+The agent has access to four tools:
+1. **`get_schema()`** - returns database table and column information
+2. **`execute_query(sql)`** - runs a SQL query and returns results
+3. **`search_knowledge_base(question)`** - finds similar past questions via `dspy.Retrieve`
+4. **`store_successful_query(question, sql, result)`** - adds to the retrieval corpus
+
+When a question comes in, the agent can first check the knowledge base for similar past queries, then generate and execute SQL, and finally store successful results for future use.
+
+## The Database Setup
+
+We'll use a simplified F1 racing dataset. Here's the schema:
+
+```sql
+-- drivers: id, name, nationality
+-- races: id, name, date, circuit
+-- results: id, race_id, driver_id, position, points
+```
+
+The actual SQLite setup is straightforward. For brevity, assume we have a `db` object with `execute()` and `get_schema()` methods. The full setup script can be found in the [companion gist](https://gist.github.com/).
+
+## Building the SQL Tools
+
+DSPy infers tool schemas from function signatures and docstrings. Here's how to define tools that the `ReAct` agent can use:
+
+```python
+def get_schema() -> str:
+    """Get the database schema including all tables and their columns."""
+    return db.get_schema()
+
+def execute_query(sql: str) -> str:
+    """Execute a SQL query against the F1 database.
+
+    Args:
+        sql: A valid SQL SELECT query
+
+    Returns:
+        Query results as a formatted string, or an error message
+    """
+    if not sql.strip().upper().startswith("SELECT"):
+        return "Error: Only SELECT queries are allowed"
+    try:
+        return db.execute(sql)
+    except Exception as e:
+        return f"Error: {e}"
+```
+
+The docstrings matter. DSPy uses them to generate tool descriptions that the LLM sees. Type hints (`sql: str`, `-> str`) tell DSPy how to parse and validate arguments.
+
+## The Basic SQL Agent
+
+Here's a minimal SQL agent using `dspy.ReAct`:
+
+```python
+import dspy
+
+class SQLAgent(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.react = dspy.ReAct(
+            signature="question -> answer",
+            tools=[get_schema, execute_query],
+            max_iters=6
+        )
+
+    def forward(self, question: str):
+        return self.react(question=question)
+```
+
+That's it. The `ReAct` module handles the reasoning loop:
+
+1. **Think** - decide what to do next
+2. **Act** - call a tool
+3. **Observe** - see the result
+4. **Repeat** until the agent calls `finish` or hits `max_iters`
+
+### Example Interaction
+
+```python
+dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"))
+
+agent = SQLAgent()
+result = agent(question="Who won the most races in 2023?")
+
+print(result.answer)
+# "Max Verstappen won the most races in 2023 with 19 victories."
+
+print(result.trajectory)
+# Shows: Think → get_schema() → Think → execute_query("SELECT...") → finish
+```
+
+The `trajectory` field contains the full reasoning trace: every thought, tool call, and observation. This is useful for debugging and understanding how the agent arrived at its answer.
+
+## LM + RM: The DSPy Way
+
+Here's where DSPy's design shines. Most frameworks treat retrieval as an afterthought—something you bolt on with a separate vector database. DSPy treats retrieval as a first-class concept, parallel to language modeling.
+
+DSPy has two core abstractions:
+- **LM** (Language Model) - generates text
+- **RM** (Retriever Model) - retrieves relevant passages
+
+You configure both together:
+
+```python
+from dspy.retrievers.embeddings import Embeddings
+
+# Create an embedding-based retriever
+knowledge_base = Embeddings(
+    embedder=dspy.Embedder("openai/text-embedding-3-small"),
+    corpus=[],  # Start empty, populate with successful queries
+    k=3
+)
+
+# Configure both LM and RM
+dspy.configure(
+    lm=dspy.LM("openai/gpt-4o-mini"),
+    rm=knowledge_base
+)
+```
+
+Now any `dspy.Retrieve()` call in your program automatically uses this retriever:
+
+```python
+# This module uses the configured RM
+retrieve = dspy.Retrieve(k=3)
+similar_queries = retrieve(query="Who won the championship?")
+print(similar_queries.passages)  # Returns similar past entries
+```
+
+The `Embeddings` retriever stores passages in memory and uses FAISS for efficient similarity search (automatically enabled for corpora over 20k documents).
+
+### Persistence Options
+
+The in-memory `Embeddings` retriever supports `save()` and `load()` for disk persistence:
+
+```python
+# Save the knowledge base to disk
+knowledge_base.save("./kb_cache")
+# Saves: config.json, corpus_embeddings.npy, faiss_index.bin
+
+# Load it back
+knowledge_base = Embeddings.from_saved("./kb_cache", embedder)
+```
+
+For production deployments with external vector databases, swap in `WeaviateRM` or `DatabricksRM`—without changing your agent code:
+
+```python
+from dspy.retrievers.weaviate_rm import WeaviateRM
+
+# Production: use Weaviate for managed persistence
+knowledge_base = WeaviateRM(
+    weaviate_collection_name="sql_knowledge_base",
+    weaviate_client=weaviate_client,
+    k=3
+)
+
+dspy.configure(lm=dspy.LM("openai/gpt-4o-mini"), rm=knowledge_base)
+```
+
+The RM interface is the same. Your agent code doesn't change—only the configuration.
+
+## Adding Self-Improvement
+
+Now we add knowledge base tools that let the agent learn from successful queries:
+
+```python
+# Reference to the configured RM
+knowledge_base = None  # Set during configuration
+
+def search_knowledge_base(question: str) -> str:
+    """Search for similar past questions and their SQL solutions.
+
+    Args:
+        question: The natural language question to search for
+
+    Returns:
+        Similar past queries with their SQL and results, or empty if none found
+    """
+    retrieve = dspy.Retrieve(k=3)
+    results = retrieve(query=question)
+    if not results.passages:
+        return "No similar queries found in knowledge base."
+    return "\n---\n".join(results.passages)
+
+def store_successful_query(question: str, sql: str, result: str) -> str:
+    """Store a successful query in the knowledge base for future reference.
+
+    Args:
+        question: The original natural language question
+        sql: The SQL query that successfully answered it
+        result: The query result
+
+    Returns:
+        Confirmation message
+    """
+    entry = f"Question: {question}\nSQL: {sql}\nResult: {result}"
+    knowledge_base.corpus.append(entry)
+    return f"Stored in knowledge base. Total entries: {len(knowledge_base.corpus)}"
+```
+
+The self-improving agent now has all four tools:
+
+```python
+class SelfImprovingSQLAgent(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.react = dspy.ReAct(
+            signature="question -> answer",
+            tools=[
+                get_schema,
+                execute_query,
+                search_knowledge_base,
+                store_successful_query
+            ],
+            max_iters=8
+        )
+
+    def forward(self, question: str):
+        return self.react(question=question)
+```
+
+The agent's typical workflow becomes:
+
+1. **Search KB** - check if similar question was asked before
+2. **If found** - adapt the stored SQL
+3. **If not found** - get schema, generate SQL from scratch
+4. **Execute** - run the query
+5. **Store** - if successful, add to knowledge base
+
+Over time, common query patterns accumulate in the knowledge base. The agent gets faster and more accurate on questions similar to ones it's seen before.
+
+## Putting It Together
+
+Here's the complete working example:
+
+```python
+import dspy
+from dspy.retrievers.embeddings import Embeddings
+
+# === Database setup (implementation brushed over) ===
+class F1Database:
+    def get_schema(self) -> str: ...
+    def execute(self, sql: str) -> str: ...
+
+db = F1Database("f1.db")
+
+# === Tools ===
+def get_schema() -> str:
+    """Get the database schema including all tables and their columns."""
+    return db.get_schema()
+
+def execute_query(sql: str) -> str:
+    """Execute a SQL query against the F1 database."""
+    if not sql.strip().upper().startswith("SELECT"):
+        return "Error: Only SELECT queries are allowed"
+    try:
+        return db.execute(sql)
+    except Exception as e:
+        return f"Error: {e}"
+
+def search_knowledge_base(question: str) -> str:
+    """Search for similar past questions and their SQL solutions."""
+    retrieve = dspy.Retrieve(k=3)
+    results = retrieve(query=question)
+    if not results.passages:
+        return "No similar queries found."
+    return "\n---\n".join(results.passages)
+
+def store_successful_query(question: str, sql: str, result: str) -> str:
+    """Store a successful query in the knowledge base."""
+    entry = f"Question: {question}\nSQL: {sql}\nResult: {result}"
+    knowledge_base.corpus.append(entry)
+    return f"Stored. Total entries: {len(knowledge_base.corpus)}"
+
+# === Agent ===
+class SelfImprovingSQLAgent(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.react = dspy.ReAct(
+            signature="question -> answer",
+            tools=[get_schema, execute_query, search_knowledge_base, store_successful_query],
+            max_iters=8
+        )
+
+    def forward(self, question: str):
+        return self.react(question=question)
+
+# === Configuration ===
+knowledge_base = Embeddings(
+    embedder=dspy.Embedder("openai/text-embedding-3-small"),
+    corpus=[],
+    k=3
+)
+
+dspy.configure(
+    lm=dspy.LM("openai/gpt-4o-mini"),
+    rm=knowledge_base
+)
+
+# === Usage ===
+agent = SelfImprovingSQLAgent()
+
+# First query - no KB entries yet
+result = agent("Who won the most races in 2023?")
+print(result.answer)
+
+# After several queries, the KB has entries
+result = agent("Which driver had the most wins last season?")
+# Agent finds similar past query, adapts the SQL
+print(result.answer)
+```
+
+## Comparison with Agno Approach
+
+| Aspect | Agno | DSPy |
+|--------|------|------|
+| **Core abstraction** | Agent orchestration | Optimizable programs |
+| **Agent logic** | Framework orchestration | Built-in `dspy.ReAct` |
+| **Knowledge base** | PgVector + custom search | `dspy.Retrieve` + RM interface |
+| **Prompt optimization** | Manual | `optimizer.compile()` on your data |
+| **Tools** | Framework-specific | Plain Python functions |
+| **Production infra** | AgentOS (runtime + control plane) | Bring your own (FastAPI, etc.) |
+| **Monitoring** | Built-in control plane | Integrate with your observability stack |
+
+These aren't competing approaches—they solve different problems. Agno gives you production infrastructure out of the box: runtime, monitoring, deployment. DSPy gives you a programming model where the LLM behavior is tunable.
+
+For production DSPy deployments, you'll likely still need FastAPI for HTTP endpoints, a persistent vector database (Weaviate, PostgreSQL with pgvector), and your own monitoring. The difference is that DSPy's compilation step can optimize the agent's prompts before you deploy.
+
+## Optimizing with DSPy
+
+The real power of DSPy is compilation. You can optimize the agent's prompts and few-shot examples on your specific data:
+
+```python
+from dspy.teleprompt import BootstrapFewShot
+
+# Training data: (question, expected_answer) pairs
+trainset = [
+    dspy.Example(
+        question="How many races did Verstappen win in 2023?",
+        answer="Max Verstappen won 19 races in 2023."
+    ).with_inputs("question"),
+    dspy.Example(
+        question="Who finished second in the 2023 championship?",
+        answer="Sergio Perez finished second in the 2023 championship."
+    ).with_inputs("question"),
+    # ... more examples
+]
+
+# Compile the agent
+optimizer = BootstrapFewShot(metric=your_metric, max_bootstrapped_demos=4)
+compiled_agent = optimizer.compile(agent, trainset=trainset)
+
+# Save for later
+compiled_agent.save("./sql_agent_compiled")
+
+# Load in production
+loaded_agent = SelfImprovingSQLAgent()
+loaded_agent.load("./sql_agent_compiled")
+```
+
+Compilation finds prompts and demonstrations that work well on your training data. The compiled agent often performs significantly better than the unoptimized version, especially on domain-specific queries.
+
+For more sophisticated optimization, consider `MIPROv2` which can also optimize instructions:
+
+```python
+from dspy.teleprompt import MIPROv2
+
+optimizer = MIPROv2(metric=your_metric, num_candidates=10)
+compiled_agent = optimizer.compile(agent, trainset=trainset, valset=valset)
+```
+
+## Production Deployment
+
+For production, you'll want:
+
+**Persistent RM**: Use `WeaviateRM` or `DatabricksRM` instead of in-memory `Embeddings`:
+
+```python
+from dspy.retrievers.weaviate_rm import WeaviateRM
+import weaviate
+
+client = weaviate.connect_to_wcs(
+    cluster_url=os.getenv("WEAVIATE_URL"),
+    auth_credentials=weaviate.auth.Auth.api_key(os.getenv("WEAVIATE_API_KEY"))
+)
+
+knowledge_base = WeaviateRM(
+    weaviate_collection_name="sql_knowledge_base",
+    weaviate_client=client,
+    k=3
+)
+```
+
+**HTTP API**: Wrap the agent in FastAPI:
+
+```python
+from fastapi import FastAPI
+app = FastAPI()
+
+@app.post("/query")
+def query(question: str):
+    result = agent(question=question)
+    return {"answer": result.answer, "trajectory": result.trajectory}
+```
+
+**Compiled agent**: Load the optimized version:
+
+```python
+agent = SelfImprovingSQLAgent()
+agent.load("./sql_agent_compiled")  # Load optimized prompts
+```
+
+The infrastructure looks similar to Agno's—FastAPI, vector database, containerized deployment. The difference is the DSPy agent inside has been compiled on your data.
+
+## Extensions
+
+A few directions to take this further:
+
+**Multi-table reasoning**: Add a `list_tables()` tool and a `describe_table(name)` tool for databases with many tables.
+
+**Query validation**: Add an `explain_query(sql)` tool that returns the query plan, helping the agent catch inefficient queries before execution.
+
+**Approval workflow**: Instead of auto-storing successful queries, return them for human approval before adding to the knowledge base.
+
+**Guardrails**: Add input validation and output filtering. DSPy doesn't have built-in guardrails like Agno—you'll need to implement them in your tools or wrap the agent.
+
+## Conclusion
+
+DSPy's `ReAct` + `Retrieve` pattern gives you a self-improving SQL agent where the LLM behavior is optimizable. The `lm` + `rm` configuration model treats retrieval as a first-class concept. Compilation lets you tune prompts on your data before deployment.
+
+For production, you'll still need the infrastructure—FastAPI, persistent vector storage, monitoring. DSPy doesn't replace that. What it gives you is a programming model where you can systematically improve how the agent reasons, rather than manually tweaking prompts.
+
+Agno and DSPy aren't mutually exclusive. You could use DSPy to build and optimize the agent logic, then deploy it within Agno's runtime for production infrastructure. The abstractions are complementary.
