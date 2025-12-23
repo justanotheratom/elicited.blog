@@ -1,0 +1,246 @@
+---
+title: "Is Data Curation the New Feature Engineering?"
+description: "Drawing parallels between Feature Engineering in traditional ML and Data Curation in AI Engineering."
+pubDatetime: 2025-12-23T00:00:00Z
+modDatetime: 2025-12-23T00:00:00Z
+author: "Sanket Patel"
+featured: false
+draft: false
+tags:
+  - gepa
+  - dspy
+  - architecture
+---
+
+# Drawing parallels between Feature Engineering in traditional ML and Data Curation in AI Engineering.
+
+*AI-generated entry. See [What & Why](/posts/what-and-why) for context.*
+
+---
+
+In my [last post about GEPA](/posts/non-obvious-things-about-gepa), I dug into the mechanics: per-example Pareto frontiers, specialist-to-generalist evolution, mini-batch sampling, how the metric's feedback teaches the reflection LLM what to fix. That was based on reading the source code. Understanding the algorithm felt like the hard part.
+
+But as I've spent more time with DSPy and its optimizers, running various compile experiments, I've started to notice something: most of this feels mechanical once you get the hang of it. Configure the optimizer. Set your budget. Write a metric with good feedback. Run compile. Evaluate. Iterate.
+
+Except one thing: **data curation.**
+
+This seems like the part that requires genuine human input. It's different for every DSPy program. It can't be templated. It requires understanding your problem domain, identifying what failure modes matter, deciding how to tag and stratify your examples, and ensuring coverage of the cases you care about.
+
+Once you have a well-curated and labeled dataset, split appropriately for your optimizer, the rest could probably be handled by a script. Or a Claude Code skill. The mechanical parts are automatable. The curation isn't.
+
+This led me to wonder: is data curation for LLM optimization analogous to feature engineering in traditional ML?
+
+I think it might be. And the parallel seems to run deeper than I initially expected.
+
+## The Parallel
+
+In traditional ML, feature engineering determines what patterns a model *can* learn. You transform raw signals into representations that expose the structure of the problem. Bad features mean the model is blind to important relationships.
+
+In DSPy + GEPA, data curation plays the same role. You're not engineering features in the data. You're engineering features *about* the data that determine what the optimizer can explore.
+
+| Traditional ML | DSPy + GEPA |
+|----------------|-------------|
+| Features are inputs to the model | Data characteristics are inputs to the optimizer |
+| Shapes the hypothesis space | Shapes the demonstration/prompt space |
+| Domain knowledge extracts signal | Domain knowledge tags examples |
+| Bad features = blind model | Bad data = blind optimizer |
+
+## Why This Matters for GEPA
+
+Based on my reading of how GEPA works, it needs two things from your data: examples to learn from (trainset) and examples to evaluate against (valset). The split matters.
+
+**Trainset**: GEPA samples mini-batches, runs your program, collects traces, and reflects on failures. The reflection LLM proposes improvements based on what it sees. If the trainset doesn't cover a failure mode, GEPA presumably never learns to address it.
+
+**Valset**: GEPA maintains per-example Pareto frontiers. Each val example is a survival niche for candidates that excel on it. Specialists emerge. The final candidate is selected by average score across all val examples.
+
+**What I think matters when splitting for GEPA:**
+
+- Both splits probably need diversity. Trainset diversity likely determines what directions GEPA explores. Valset diversity determines which explorations survive.
+- Valset can be smaller than trainset (saves budget), but it seems like it should still cover the patterns that matter.
+- Near-duplicate examples likely waste budget and skew optimization.
+- If a failure mode only appears in valset but not trainset, GEPA will be penalized for it but never learn to fix it. (This is my hypothesis — haven't confirmed it empirically.)
+
+The broader intuition: **GEPA can only reflect on failures it sees.** If your data doesn't surface the problems that matter, the optimizer is blind to them. This feels analogous to missing a critical feature in traditional ML.
+
+## What "Features" Mean in Each World
+
+**Traditional ML features:**
+- Age from birthdate
+- TF-IDF from text
+- Ratios and interactions
+- PCA components
+
+**Data curation "features" (meta-characteristics):**
+- Complexity tier (simple vs multi-hop reasoning)
+- Domain cluster
+- Edge case vs typical
+- Input length bucket
+- Required capabilities (math, retrieval, tool use)
+- Ambiguity level
+
+You tag your examples by these characteristics. Then you stratify your train/val splits to ensure coverage. GEPA samples from this curated space.
+
+## The Human-in-the-Loop Part
+
+In traditional ML, feature engineering is where human domain knowledge shapes what the model can learn. You can automate hyperparameter tuning. You can use AutoML for architecture search. But someone has to decide that "days since last purchase" matters more than "raw timestamp."
+
+I see a similar pattern emerging with LLM optimization:
+
+| Traditional ML | DSPy + GEPA |
+|----------------|-------------|
+| Feature engineering | Data curation |
+| Loss function design | Metric + feedback function |
+| Model architecture | Module/signature design |
+| Hyperparameter tuning | Optimizer config (auto="light/medium/heavy") |
+
+Data curation seems to be where your judgment shapes the optimizer's search space.
+
+GEPA also has a second human-in-the-loop component: the feedback function. GEPA's power comes from rich textual feedback, not just scalar scores. You decide what failure modes to surface. You decide how to decompose errors into actionable text.
+
+> If this analogy holds: Data curation is to GEPA what feature engineering is to gradient descent. The feedback function is like the loss function — it defines what success means. Data curation defines what examples exist to learn from.
+
+## Data Curation Techniques
+
+Feature engineering has a well-established toolkit. I suspect data curation could have an analogous one.
+
+| Feature Engineering | Possible Data Curation Analog |
+|---------------------|------------------------------|
+| Imputation (fill missing values) | Synthetic example generation (fill coverage gaps) |
+| Normalization (common scale) | Difficulty calibration (balanced complexity distribution) |
+| Binning (continuous → discrete) | Stratification tags (bucket by complexity, domain, capability) |
+| One-hot encoding | Multi-label tagging (is_edge_case, requires_math, multi_hop) |
+| Feature selection (drop irrelevant) | Example pruning (remove noisy, mislabeled, redundant) |
+| Outlier handling | Edge case curation (deliberately include or exclude extremes) |
+| Dimensionality reduction | Embedding-based deduplication (remove near-duplicates) |
+
+### Techniques I'm thinking about for LLM optimization
+
+**Difficulty scoring.** Run your baseline program on all examples. Bucket by performance. Now you know what's easy, medium, hard.
+
+```python
+results = [(ex, program(ex), metric(ex, program(ex))) for ex in examples]
+easy = [ex for ex, _, score in results if score > 0.9]
+medium = [ex for ex, _, score in results if 0.5 < score <= 0.9]
+hard = [ex for ex, _, score in results if score <= 0.5]
+```
+
+**Failure mode tagging.** Beyond just scoring, categorize *why* things fail.
+
+```python
+def tag_failure(example, prediction, trace):
+    tags = []
+    if missing_retrieval(trace): tags.append("retrieval_failure")
+    if wrong_reasoning(prediction): tags.append("reasoning_error")
+    if format_error(prediction): tags.append("format_failure")
+    return tags
+```
+
+**Capability coverage.** List the skills your program needs. Check if each has examples.
+
+- Retrieval
+- Multi-hop reasoning
+- Math/calculation
+- Tool use
+- Ambiguity resolution
+
+If your trainset has zero multi-hop examples, GEPA probably can't learn to handle multi-hop.
+
+**Contrastive pairs.** Add examples that look similar but have different answers. Should force the model to learn fine distinctions.
+
+```python
+# These should both be in your trainset
+{"question": "Who founded Microsoft?", "answer": "Bill Gates and Paul Allen"}
+{"question": "Who founded Apple?", "answer": "Steve Jobs, Steve Wozniak, and Ronald Wayne"}
+```
+
+**Synthetic gap-filling.** Use an LLM to generate examples for underrepresented categories.
+
+```python
+prompt = f"""
+Generate 5 examples that require multi-hop reasoning.
+Each should need at least 2 retrieval steps.
+Format: {{"question": "...", "answer": "..."}}
+"""
+```
+
+Then validate. Synthetic examples probably need human review or at least spot-checking.
+
+**Embedding-based deduplication.** Near-duplicate examples probably waste budget and skew the optimizer.
+
+```python
+from sklearn.cluster import KMeans
+embeddings = embed(examples)
+clusters = KMeans(n_clusters=len(examples)//5).fit(embeddings)
+deduplicated = [examples[i] for i in get_cluster_centroids(clusters)]
+```
+
+## What I Plan to Try
+
+### 1. Audit before tuning
+
+Before adding another module or swapping strategies, run difficulty scoring. Look at the distribution. If 80% of your examples are easy, GEPA will probably optimize for easy cases.
+
+### 2. Stratify deliberately
+
+Rather than random-sampling train/val splits, try to cover all difficulty tiers, all domains, and representative edge cases in each split. GEPA uses trainset for reflection and valset for Pareto scoring. Both likely need coverage.
+
+### 3. Design feedback that surfaces failures
+
+The metric function does double duty. The score defines what GEPA optimizes for. The feedback text teaches the reflection LLM what to fix.
+
+```python
+# Weak signal
+return 0.7
+
+# Stronger signal (I think)
+return dspy.Prediction(
+    score=0.7,
+    feedback="Correct answer but reasoning skipped step 2. "
+             "Model jumped from premise to conclusion without intermediate inference."
+)
+```
+
+### 4. Iterate on data, not just code
+
+When optimization stalls, check data coverage before tweaking the program. Which failure modes aren't represented? Generate or collect examples for those cases. Re-stratify. Run again.
+
+## What Changes, What Stays
+
+Here's a mental model I'm developing:
+
+**My DSPy program doesn't change much after the initial design.**
+
+The signatures, the module structure, the control flow — once you've figured out a reasonable architecture, not much changes.
+
+**What does seem to change:**
+
+1. **Training data** — As your program runs in production, you collect new examples. Failures become training data. Edge cases get added. Coverage expands.
+
+2. **Optimization configs** — Different experiments with `auto="light"` vs `auto="heavy"`. Different reflection LMs. Different minibatch sizes. These are your hyperparameter sweeps.
+
+3. **Stratification strategy** — As you learn which failure modes matter, you re-tag and re-balance your splits.
+
+4. **Feedback functions** — As you understand what signals help the optimizer, you refine what gets surfaced.
+
+This seems to map to traditional ML:
+
+| Traditional ML | DSPy + GEPA |
+|----------------|-------------|
+| Model architecture (fixed) | Program structure (fixed) |
+| Training data (grows) | Training data (grows) |
+| Hyperparameters (tweaked) | Optimizer config (tweaked) |
+| Feature engineering (iterated) | Data curation (iterated) |
+
+The program is the scaffold. The data is what learns. At least, that's my current thinking.
+
+## The Takeaway
+
+If this parallel holds, then just as good feature engineering can make a simple model outperform a complex one with bad features, good data curation might make a basic DSPy program outperform a sophisticated one with poorly structured training data.
+
+The optimizer is a search algorithm. Your job is to shape what it searches over.
+
+Maybe that's the new feature engineering. I'll report back once I've tested this more.
+
+---
+
+*This is Part 2 of my GEPA journey. Part 1: [Non-Obvious Things I Learned About GEPA](/posts/non-obvious-things-about-gepa)*
