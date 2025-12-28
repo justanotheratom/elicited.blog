@@ -1,4 +1,6 @@
 ---
+import { SITE } from "@/config";
+
 // Remove current url path and remove trailing slash if exists
 const currentUrlPath = Astro.url.pathname.replace(/\/+$/, "");
 
@@ -21,9 +23,41 @@ if (breadcrumbList[0] === "tags" && !isNaN(Number(breadcrumbList[2]))) {
     `${breadcrumbList[1]} ${Number(breadcrumbList[2]) === 1 ? "" : "(page " + breadcrumbList[2] + ")"}`
   );
 }
+
+// Build breadcrumb schema from URL path
+const pathSegments = currentUrlPath.split("/").filter(Boolean);
+
+const breadcrumbSchemaItems = [
+  {
+    "@type": "ListItem",
+    position: 1,
+    name: "Home",
+    item: SITE.website.replace(/\/$/, ""),
+  }
+];
+
+// Build items from path segments
+let cumulativePath = "";
+pathSegments.forEach((segment, index) => {
+  cumulativePath += `/${segment}`;
+
+  breadcrumbSchemaItems.push({
+    "@type": "ListItem",
+    position: index + 2,
+    name: decodeURIComponent(segment),
+    item: `${SITE.website.replace(/\/$/, "")}${cumulativePath}`,
+  });
+});
+
+const breadcrumbSchema = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: breadcrumbSchemaItems,
+};
 ---
 
 <nav class="mx-auto mt-8 mb-1 w-full max-w-app px-4" aria-label="breadcrumb">
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(breadcrumbSchema)} />
   <ul
     class="font-light [&>li]:inline [&>li:not(:last-child)>a]:hover:opacity-100"
   >

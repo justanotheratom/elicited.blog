@@ -67,6 +67,42 @@ const layoutProps = {
   scrollSmooth: true,
 };
 
+/* ========== Structured Data (Schema.org JSON-LD) ========== */
+
+const articleUrl = canonicalURL || new URL(getPath(post.id, post.filePath), Astro.url.origin).href;
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  headline: title,
+  description: description,
+  author: {
+    "@type": "Person",
+    name: author || SITE.author,
+    url: SITE.profile,
+  },
+  datePublished: pubDatetime.toISOString(),
+  ...(modDatetime && { dateModified: modDatetime.toISOString() }),
+  ...(ogImage && {
+    image: {
+      "@type": "ImageObject",
+      url: ogImage,
+    },
+  }),
+  publisher: {
+    "@type": "Organization",
+    name: SITE.title,
+    logo: {
+      "@type": "ImageObject",
+      url: new URL(SITE.ogImage, Astro.url.origin).href,
+    },
+  },
+  mainEntityOfPage: {
+    "@type": "WebPage",
+    "@id": articleUrl,
+  },
+};
+
 /* ========== Prev/Next Posts ========== */
 
 const allPosts = posts.map(({ data: { title }, id, filePath }) => ({
@@ -83,6 +119,7 @@ const nextPost =
 ---
 
 <Layout {...layoutProps}>
+  <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />
   <Header />
   <BackButton />
   <main

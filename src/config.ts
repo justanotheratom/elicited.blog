@@ -1,7 +1,7 @@
 export const SITE = {
   website: "https://www.elicited.blog/",
-  author: "Your Name",
-  profile: "https://example.com/",
+  author: "Sanket Patel",
+  profile: "https://x.com/realsanketp",
   desc: "A personal blog about engineering, learning, and creativity.",
   title: "Elicited",
   ogImage: "astropaper-og.jpg",
@@ -14,7 +14,7 @@ export const SITE = {
   editPost: {
     enabled: true,
     text: "Suggest Changes",
-    url: "https://github.com/YOUR_USERNAME/my-blog/edit/main/",
+    url: "https://github.com/justanotheratom/elicited.blog/edit/main/",
   },
   dynamicOgImage: true,
   dir: "ltr", // "rtl" | "auto"
