@@ -14,6 +14,7 @@ export interface Props {
   pubDatetime?: Date;
   modDatetime?: Date | null;
   scrollSmooth?: boolean;
+  markdownURL?: string;
 }
 
 const {
@@ -25,6 +26,7 @@ const {
   pubDatetime,
   modDatetime,
   scrollSmooth = false,
+  markdownURL,
 } = Astro.props;
 
 const socialImageURL = new URL(ogImage, Astro.url);
@@ -89,6 +91,16 @@ const socialImageURL = new URL(ogImage, Astro.url);
       title={SITE.title}
       href={new URL("rss.xml", Astro.site)}
     />
+
+    {/* Enable Markdown auto-discovery for AI crawlers */}
+    {markdownURL && (
+      <link
+        rel="alternate"
+        type="text/markdown"
+        title={`${title} (Markdown)`}
+        href={markdownURL}
+      />
+    )}
 
     <meta name="theme-color" content="" />
 
