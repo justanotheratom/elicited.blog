@@ -119,10 +119,11 @@ const socialImageURL = new URL(ogImage, Astro.url);
     <ClientRouter />
 
     <script is:inline src="/toggle-theme.js"></script>
+
+    <Analytics />
   </head>
   <body>
     <slot />
-    <Analytics />
   </body>
 </html>
 
