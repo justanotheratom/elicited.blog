@@ -1,0 +1,35 @@
+<svg width="680" height="444" viewBox="0 0 680 444" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <rect width="680" height="444" fill="#ffffff"/>
+
+  <!-- Column headers -->
+  <text x="252" y="48" text-anchor="middle" font-size="14" font-weight="500" fill="#2C2C2A">Diminished social skills</text>
+  <text x="497" y="48" text-anchor="middle" font-size="14" font-weight="500" fill="#2C2C2A">Strong social skills</text>
+
+  <!-- Row headers -->
+  <text x="122" y="144" text-anchor="end" font-size="14" font-weight="500" fill="#2C2C2A">Introvert</text>
+  <text x="122" y="314" text-anchor="end" font-size="14" font-weight="500" fill="#2C2C2A">Extrovert</text>
+
+  <!-- Q1: Introvert + Diminished (amber) -->
+  <rect x="130" y="60" width="243" height="168" rx="8" fill="#FAEEDA" stroke="#BA7517" stroke-width="0.5"/>
+  <text x="252" y="130" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#633806">Skill gap by neglect</text>
+  <text x="252" y="154" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#854F0B">Low exposure compounds over time</text>
+  <text x="252" y="174" text-anchor="middle" dominant-baseline="central" font-size="11" fill="#BA7517" font-style="italic">can causally produce -&gt;</text>
+
+  <!-- Q2: Introvert + Strong (teal) -->
+  <rect x="375" y="60" width="245" height="168" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+  <text x="497" y="132" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#085041">Selective and capable</text>
+  <text x="497" y="156" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#0F6E56">Competent but choosy</text>
+
+  <!-- Q3: Extrovert + Diminished (coral) -->
+  <rect x="130" y="230" width="243" height="168" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+  <text x="252" y="302" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#712B13">Frustrated connector</text>
+  <text x="252" y="326" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#993C1D">Craves connection, struggles</text>
+
+  <!-- Q4: Extrovert + Strong (purple) -->
+  <rect x="375" y="230" width="245" height="168" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+  <text x="497" y="302" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#3C3489">Classic extrovert</text>
+  <text x="497" y="326" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#534AB7">Thrives through interaction</text>
+
+  <!-- Footer note -->
+  <text x="376" y="422" text-anchor="middle" font-size="11" fill="#888780">Personality and skill are independent axes - and can causally interact</text>
+</svg>
