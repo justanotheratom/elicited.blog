@@ -1,0 +1,196 @@
+---
+title: "Helix: Closing the Loop on DSPy Programs"
+description: "Why I think DSPy programs need a managed optimization loop, not scattered experiments."
+pubDatetime: 2026-04-15T18:30:00Z
+modDatetime: 2026-04-15T18:30:00Z
+author: "Sanket Patel"
+featured: false
+draft: false
+tags:
+  - dspy
+  - architecture
+  - helix
+---
+
+# Helix: Closing the Loop on DSPy Programs
+
+_AI-generated entry. See [What & Why](/posts/what-and-why) for context._
+
+---
+
+Last week, I ran a bunch of experiments on our ingredient analyzer.
+
+It is a DSPy program that reads food labels and tells you whether a product matches a user's dietary preferences. I tried different models, different optimizers, different reasoning strategies, and the dataset changed while I was still experimenting.
+
+By the end, I had something like this sitting in a chat window:
+
+```text
+cerebras/gpt-oss-120b (GEPA, low)   73.35%    780ms
+gemini-3.1-flash-lite (GEPA)         70.03%  3,334ms
+gpt-5.4-mini (baseline)              64.49%  2,559ms
+gemma-4-31b-it (baseline)            52.53% 40,825ms
+```
+
+I picked the best-looking one, copied a pickle file into a deploy directory, pushed to git, and moved on.
+
+Then three things happened:
+
+1. A teammate asked which experiment had produced the deployed program.
+2. Someone added new test examples, and nobody re-ran the deployed program against them.
+3. Production traces accumulated in Langfuse, and nobody looked at them.
+
+That is the motivation behind **Helix**.
+
+The problem is not that teams cannot run experiments. DSPy already makes optimization practical. The problem is that most of us still run optimization as a sequence of disconnected events. The experiments happen. The results are real. But the loop breaks.
+
+## The loop is the real unit
+
+The hard part is not compiling a program once. The hard part is turning production behavior into the next round of improvement.
+
+A serious DSPy system should form a loop:
+
+- production traces surface new edge cases
+- humans review and label the cases that matter
+- the dataset changes
+- deployed and candidate programs are re-evaluated on the fresh dataset
+- new candidates are compiled and compared
+- a human decides what to promote
+
+In most teams, those steps exist, but they live in different places.
+
+Traces live in one system. Datasets live in another. Evals run ad hoc. Deployment decisions happen in chat. So the loop stays open.
+
+That is why Helix is not primarily an experiment tracker. It is an attempt to close the lifecycle loop of a DSPy program.
+
+## Why DSPy first
+
+I do not think DSPy is the only interesting optimization system in the ecosystem. There are adjacent projects like [AdalFlow](https://adalflow.sylph.ai/) and [TextGrad](https://www.textgrad.com/index.html), and there are prompt optimization products from companies like OpenAI and Arize.
+
+But DSPy is the clearest current example of an optimization-native programming model for LLM systems.
+
+You define a program. You compile it. You evaluate it. You compare compiled variants. You deploy one. That lifecycle is explicit in DSPy, which is exactly why the gaps around that lifecycle become so obvious.
+
+So Helix is **DSPy-first**.
+
+The underlying problem is broader than DSPy. But DSPy is where I think the need is sharpest and the abstractions are cleanest.
+
+## What makes the loop hard
+
+Once you are optimizing a DSPy program, several things move at once.
+
+**The program changes.** The signature evolves. The implementation evolves. A simple predictor becomes chain-of-thought, then a multi-step pipeline, then maybe a tool-using program.
+
+**The metric changes.** The definition of "better" is not static. You tweak weights, add dimensions, fix scoring bugs, and sometimes realize you were rewarding the wrong thing.
+
+**The dataset changes.** New edge cases arrive. Old labels get corrected. Production teaches you things your synthetic eval set did not.
+
+**The splits change.** Train, validation, and test boundaries move, which changes both compile-time behavior and evaluation results.
+
+**The compilation config changes.** Student model, optimizer, reflection model, runtime strategy, temperature, reasoning effort, batch size, search budget, and whatever else the optimizer exposes.
+
+This is the obvious source of complexity.
+
+But there is one more dimension that matters just as much:
+
+**The deployment context changes.** A candidate can win on the metrics you measure and still be the wrong thing to ship because of provider limits, reliability, pricing, compliance, or some business constraint that is not represented in the optimization system at all.
+
+That is why the problem is not "run more experiments." The problem is keeping the lifecycle legible while all of those dimensions are moving at once.
+
+## The two human gates
+
+I do not want Helix to remove humans from the loop.
+
+I want it to automate everything _around_ the two places where human judgment is irreducible.
+
+### 1. Ground truth
+
+Helix should ingest production traces, deduplicate them, cluster them, and draft candidate labels.
+
+But those labels should not become dataset truth on their own.
+
+A human still approves, edits, or rejects them before they enter the dataset.
+
+### 2. Promotion
+
+Helix should evaluate candidates and surface trade-offs across the dimensions it can measure: accuracy, latency, cost, and so on.
+
+But it should not decide what ships.
+
+A human still approves promotion, because shipping depends on constraints that may not live inside the optimization loop at all. Maybe the best candidate relies on a provider with annoying rate limits. Maybe it is too slow at p95. Maybe legal or procurement constraints rule it out. Maybe the business wants the cheaper model right now.
+
+So the boundary is simple:
+
+- Helix helps determine what performs best on measured dimensions.
+- Humans decide what counts as ground truth.
+- Humans decide what is worth deploying.
+
+Everything between those gates should be automated, tracked, and comparable.
+
+## What breaks today
+
+Without a managed loop, a few failure modes show up immediately.
+
+**Lineage gets lost.** Six months later, nobody remembers which dataset version, metric implementation, split definition, optimizer config, and source code snapshot produced the program that was shipped.
+
+**Comparisons stay shallow.** You can compare aggregate scores, but the useful questions are deeper. Which examples changed? Did the prompt change materially? Did the dataset version change? Was the metric identical?
+
+**Production feedback goes unused.** The most valuable data is often sitting in traces from real users, but there is no disciplined path from interesting trace to reviewed example to fresh evaluation.
+
+**Team concurrency gets dangerous.** One person is changing the metric, another is adding examples, another is compiling candidates, and suddenly nobody is comparing apples to apples.
+
+## The shape of Helix
+
+The way I think about Helix is simple.
+
+It is a system that keeps the loop closed:
+
+- version the dataset and split definitions
+- snapshot the program code and metric code used by every experiment
+- store the full compilation configuration
+- keep per-example evaluation results, not just aggregate scores
+- track what is currently deployed
+- pull in production traces and queue them for human review
+- stage promotion candidates with enough context for a human decision
+
+The interface I want is also simple.
+
+The primary interface is an AI agent, because the mechanical work is tedious:
+
+> Run ingredient-analyzer with GEPA on gemini-flash, compare it against what is deployed, and prepare a recommendation if the trade-offs are good.
+
+The agent should handle the mechanics. It should generate the config, run the compile, evaluate the result, compare it against other candidates, and present the outcome for review.
+
+But it should stop at the two human gates.
+
+The dashboard matters too, but mostly as a shared surface for inspection and review: browsing experiments, drilling into per-example diffs, reviewing traces, and approving promotions.
+
+## Why the name Helix
+
+I keep picturing the lifecycle as a spiral.
+
+Each turn passes through the same phases again: trace, review, compile, evaluate, compare, approve.
+
+But if the loop is working, each turn starts from a better place than the last one. Production behavior feeds the next dataset. The dataset sharpens the next evaluation. The evaluation informs the next compile. The program improves.
+
+That is the image behind the name.
+
+Not a one-off experiment. A continuously improving loop.
+
+## Closing thought
+
+I think every team doing serious optimization on DSPy programs eventually runs into the same wall.
+
+The wall is not lack of optimizers. It is not lack of evals. It is not even lack of production traces.
+
+The wall is that the lifecycle is fragmented.
+
+Helix is my attempt to make that lifecycle explicit, closed, and continuously improving, while keeping the two irreversible decisions in human hands: what counts as truth, and what is worth shipping.
+
+## References
+
+- [DSPy](https://dspy.ai/)
+- [AdalFlow](https://adalflow.sylph.ai/)
+- [TextGrad](https://www.textgrad.com/index.html)
+- [TextGrad on GitHub](https://github.com/zou-group/textgrad)
+- [OpenAI Prompt Optimizer](https://platform.openai.com/docs/guides/prompt-optimizer)
+- [Arize AX Prompt Optimization](https://arize.com/docs/ax/prompts/prompt-optimization/prompt-learning)
