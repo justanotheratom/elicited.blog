@@ -93,9 +93,7 @@ const recentPosts = sortedPosts.filter(({ data }) => !data.featured);
     set(key: string, value: string): void {
       try {
         window?.sessionStorage?.setItem?.(key, value);
-      } catch (error) {
-        console.warn("sessionStorage is unavailable:", error);
-      }
+      } catch {}
     },
   };
 

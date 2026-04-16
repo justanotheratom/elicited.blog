@@ -9,6 +9,8 @@ const PUBLIC_DIR = path.resolve(process.cwd(), "public");
 
 const mdPostLink = /!?\[[^\]]*?\]\(([^)\s]+)(?:\s+["'][^"']*["'])?\)/g;
 const htmlLink = /\b(?:href|src)=["']([^"']+)["']/g;
+const printInfo = message => process.stdout.write(`${message}\n`);
+const printWarn = message => process.stderr.write(`${message}\n`);
 
 function toPosix(filePath) {
   return filePath.split(path.sep).join("/");
@@ -305,18 +307,18 @@ async function run() {
   }
 
   if (errors.length === 0) {
-    console.log(`✅ Content check passed (${postPaths.length} posts, ${totalLinks} links).`);
+    printInfo(`✅ Content check passed (${postPaths.length} posts, ${totalLinks} links).`);
     return;
   }
 
-  console.error(`❌ Content check failed: ${errors.length} broken internal reference(s)`);
+  printWarn(`❌ Content check failed: ${errors.length} broken internal reference(s)`);
   for (const error of errors) {
-    console.error(`- ${error.file} -> ${error.link} (${error.reason})`);
+    printWarn(`- ${error.file} -> ${error.link} (${error.reason})`);
   }
   process.exit(1);
 }
 
 run().catch(error => {
-  console.error("❌ Content check crashed:", error);
+  printWarn(`❌ Content check crashed: ${error}`);
   process.exit(1);
 });
