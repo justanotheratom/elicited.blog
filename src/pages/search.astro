@@ -30,7 +30,8 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
     const pageFindSearch: HTMLElement | null =
       document.querySelector("#pagefind-search");
 
-    if (!pageFindSearch || pageFindSearch.dataset.pagefindInit === "true") return;
+    if (!pageFindSearch || pageFindSearch.dataset.pagefindInit === "true")
+      return;
     pageFindSearch.dataset.pagefindInit = "true";
 
     const params = new URLSearchParams(window.location.search);

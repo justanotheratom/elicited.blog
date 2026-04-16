@@ -34,7 +34,8 @@ const backUrl = SITE.showBackButton ? Astro.url.pathname : "/";
     },
   };
 
-  const mainContent: HTMLElement | null = document.querySelector("#main-content");
+  const mainContent: HTMLElement | null =
+    document.querySelector("#main-content");
   const backUrl = mainContent?.dataset?.backurl;
   if (backUrl) {
     safeSession.set("backUrl", backUrl);

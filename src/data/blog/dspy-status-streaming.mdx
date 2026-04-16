@@ -12,7 +12,7 @@ tags:
   - agents
 ---
 
-*AI-generated entry. See [What & Why](/posts/what-and-why) for context.*
+_AI-generated entry. See [What & Why](/posts/what-and-why) for context._
 
 # Real-Time Tool Call Updates in DSPy with Status Streaming
 
@@ -44,17 +44,18 @@ import dspy
 class MyStatusProvider(dspy.streaming.StatusMessageProvider):
     def tool_start_status_message(self, instance, inputs):
         return f"🔍 Calling {instance.name}..."
-    
+
     def tool_end_status_message(self, outputs):
         return f"✅ Done: {str(outputs)[:50]}"
-    
+
     def lm_start_status_message(self, instance, inputs):
         return "🤖 Thinking..."
 ```
 
 Available hooks:
+
 - `tool_start_status_message` / `tool_end_status_message`
-- `lm_start_status_message` / `lm_end_status_message`  
+- `lm_start_status_message` / `lm_end_status_message`
 - `module_start_status_message` / `module_end_status_message`
 
 ## Wiring It Up
@@ -83,7 +84,7 @@ For pipelines with multiple stages, use `instance` to identify which tool/module
 
 ```python
 class PipelineStatusProvider(dspy.streaming.StatusMessageProvider):
-    
+
     def tool_start_status_message(self, instance, inputs):
         tool_name = instance.name
         if tool_name == "search_web":
@@ -91,7 +92,7 @@ class PipelineStatusProvider(dspy.streaming.StatusMessageProvider):
         elif tool_name == "calculate":
             return f"🧮 [Analysis] Computing: {inputs.get('expr', '')}"
         return f"⚙️ Running {tool_name}..."
-    
+
     def module_start_status_message(self, instance, inputs):
         name = instance.__class__.__name__
         if name == "ResearchModule":
@@ -115,7 +116,7 @@ async def query_stream(q: Query):
             elif isinstance(item, dspy.Prediction):
                 yield f"data: {json.dumps({'type': 'result', 'answer': item.answer})}\n\n"
         yield "data: [DONE]\n\n"
-    
+
     return StreamingResponse(generate(), media_type="text/event-stream")
 ```
 
@@ -126,6 +127,7 @@ I put together a self-contained script that spins up a FastAPI server with a ReA
 **[GitHub Gist: dspy_streaming_demo.py](https://gist.github.com/justanotheratom/372c8248a17ad97ca18b2dcc0ac0ceef)**
 
 Setup:
+
 ```bash
     export OPENAI_API_KEY="sk-your-key"
     python3 -m venv .venv
@@ -134,6 +136,7 @@ Setup:
 ```
 
 Run:
+
 ```bash
     python3 dspy_status_streaming.py
     # OR

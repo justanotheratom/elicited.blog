@@ -24,7 +24,7 @@
     figcaption,
     table,
     code {
-      @apply text-foreground leading-snug;
+      @apply leading-snug text-foreground;
     }
 
     a {

@@ -13,7 +13,7 @@ tags:
 
 # Introducing two Nouns that make working with DSPy clearer.
 
-*AI-generated entry. See [What & Why](/posts/what-and-why) for context.*
+_AI-generated entry. See [What & Why](/posts/what-and-why) for context._
 
 ---
 
@@ -21,7 +21,7 @@ DSPy has modules, predictors, optimizers, signatures... the vocabulary can blur 
 
 1. **What do I call ChainOfThought, ReAct, BestOfN?** They're not optimizers. They're not plain modules. They do something specific: augment how predictions happen at runtime.
 
-2. **What's the thing I pass to `compile()`?** It's a module, sure. But it's the *top-level* module, the unit of optimization. That feels distinct.
+2. **What's the thing I pass to `compile()`?** It's a module, sure. But it's the _top-level_ module, the unit of optimization. That feels distinct.
 
 I've started using two terms that help me think about this: **Strategy** and **Program**.
 
@@ -32,17 +32,20 @@ These aren't official DSPy vocabulary. They're mental models I find useful. Mayb
 Quick recap of the DSPy concepts you already know:
 
 **Signature** — Declares what a module does (inputs → outputs)
+
 ```python
 "question -> answer"
 # or class-based with descriptions
 ```
 
 **Predict** — The atomic unit that makes ONE LM call
+
 ```python
 predict = dspy.Predict("question -> answer")
 ```
 
 **Module** — Base class for composing DSPy components
+
 ```python
 class MyModule(dspy.Module):
     def forward(self, question):
@@ -50,6 +53,7 @@ class MyModule(dspy.Module):
 ```
 
 **Optimizer** — Tunes prompts/demos at compile-time (used to be called Teleprompters)
+
 ```python
 optimizer.compile(module, trainset=data)
 ```
@@ -62,7 +66,7 @@ Now for the two concepts I'm introducing.
 
 **What I mean by "Strategy":** A module that augments how `Predict` runs at runtime.
 
-DSPy ships with ChainOfThought, ReAct, BestOfN, and several others. But what *are* these things? They're not optimizers — they don't tune anything. They're not plain modules — they specifically change how LM calls happen.
+DSPy ships with ChainOfThought, ReAct, BestOfN, and several others. But what _are_ these things? They're not optimizers — they don't tune anything. They're not plain modules — they specifically change how LM calls happen.
 
 I call them **strategies**: runtime techniques for improving LM responses.
 
@@ -70,28 +74,28 @@ Most strategies are built-in, but you can write your own.
 
 ### Strategy vs. Optimizer
 
-Both strategies and optimizers exist to improve LM output. The difference is *when* they operate:
+Both strategies and optimizers exist to improve LM output. The difference is _when_ they operate:
 
-| | Strategy | Optimizer |
-|--|----------|-----------|
-| **When** | Runtime (during `forward()`) | Compile-time (during `compile()`) |
-| **How** | Changes how LM is called | Tunes prompts/demos/weights |
-| **Example** | ChainOfThought adds reasoning | MIPROv2 optimizes instructions |
+|             | Strategy                      | Optimizer                         |
+| ----------- | ----------------------------- | --------------------------------- |
+| **When**    | Runtime (during `forward()`)  | Compile-time (during `compile()`) |
+| **How**     | Changes how LM is called      | Tunes prompts/demos/weights       |
+| **Example** | ChainOfThought adds reasoning | MIPROv2 optimizes instructions    |
 
-A strategy changes the *mechanics* of prediction. An optimizer changes the *content* of prompts.
+A strategy changes the _mechanics_ of prediction. An optimizer changes the _content_ of prompts.
 
 ### Complete List of Strategies
 
-| Strategy | What It Does |
-|----------|--------------|
-| **ChainOfThought** | Adds reasoning step before prediction |
-| **ReAct** | Iterative reasoning + tool usage |
-| **ProgramOfThought** | Generates and executes Python code |
-| **CodeAct** | Code generation with tool calling |
-| **BestOfN** | Run N times, return best by reward |
-| **Refine** | Run N times with iterative feedback |
-| **MultiChainComparison** | Compare M reasoning attempts |
-| **Avatar** | Dynamic agent with tool selection |
+| Strategy                 | What It Does                          |
+| ------------------------ | ------------------------------------- |
+| **ChainOfThought**       | Adds reasoning step before prediction |
+| **ReAct**                | Iterative reasoning + tool usage      |
+| **ProgramOfThought**     | Generates and executes Python code    |
+| **CodeAct**              | Code generation with tool calling     |
+| **BestOfN**              | Run N times, return best by reward    |
+| **Refine**               | Run N times with iterative feedback   |
+| **MultiChainComparison** | Compare M reasoning attempts          |
+| **Avatar**               | Dynamic agent with tool selection     |
 
 ### Code Example
 
@@ -132,10 +136,10 @@ This mental model keeps things organized. Define a program, optimize it, export 
 
 ### Program vs. Module vs. Strategy
 
-| | Module | Strategy | Program |
-|--|--------|----------|---------|
-| **What** | Base class | Runtime augmentation | Top-level module being optimized |
-| **Role** | Building block | Improves LM responses at runtime | Unit of optimization |
+|          | Module         | Strategy                         | Program                          |
+| -------- | -------------- | -------------------------------- | -------------------------------- |
+| **What** | Base class     | Runtime augmentation             | Top-level module being optimized |
+| **Role** | Building block | Improves LM responses at runtime | Unit of optimization             |
 
 A module is the building block. A strategy is a specific kind of module that augments prediction. A program is whatever module you hand to the optimizer.
 
@@ -226,13 +230,13 @@ Strategies and optimizers aren't competing approaches. They're complementary. Pi
 
 ## Summary
 
-| Concept | What It Is | My Term? |
-|---------|------------|----------|
-| Signature | Input/output declaration | Existing |
-| Predict | Atomic LM call | Existing |
-| Module | Base class for composition | Existing |
-| Optimizer | Compile-time tuning | Existing |
+| Concept      | What It Is                              | My Term?       |
+| ------------ | --------------------------------------- | -------------- |
+| Signature    | Input/output declaration                | Existing       |
+| Predict      | Atomic LM call                          | Existing       |
+| Module       | Base class for composition              | Existing       |
+| Optimizer    | Compile-time tuning                     | Existing       |
 | **Strategy** | Module that augments Predict at runtime | **Introduced** |
-| **Program** | Top-level module being optimized | **Introduced** |
+| **Program**  | Top-level module being optimized        | **Introduced** |
 
 I find these terms useful for keeping straight what operates when. Maybe DSPy will adopt them officially someday. For now, they're just how I think about it.

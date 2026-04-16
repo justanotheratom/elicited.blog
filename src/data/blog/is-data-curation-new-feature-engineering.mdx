@@ -14,7 +14,7 @@ tags:
 
 # Drawing parallels between Feature Engineering in traditional ML and Data Curation in AI Engineering.
 
-*AI-generated entry. See [What & Why](/posts/what-and-why) for context.*
+_AI-generated entry. See [What & Why](/posts/what-and-why) for context._
 
 ---
 
@@ -34,16 +34,16 @@ I think it might be. And the parallel seems to run deeper than I initially expec
 
 ## The Parallel
 
-In traditional ML, feature engineering determines what patterns a model *can* learn. You transform raw signals into representations that expose the structure of the problem. Bad features mean the model is blind to important relationships.
+In traditional ML, feature engineering determines what patterns a model _can_ learn. You transform raw signals into representations that expose the structure of the problem. Bad features mean the model is blind to important relationships.
 
-In DSPy + GEPA, data curation plays the same role. You're not engineering features in the data. You're engineering features *about* the data that determine what the optimizer can explore.
+In DSPy + GEPA, data curation plays the same role. You're not engineering features in the data. You're engineering features _about_ the data that determine what the optimizer can explore.
 
-| Traditional ML | DSPy + GEPA |
-|----------------|-------------|
+| Traditional ML                   | DSPy + GEPA                                      |
+| -------------------------------- | ------------------------------------------------ |
 | Features are inputs to the model | Data characteristics are inputs to the optimizer |
-| Shapes the hypothesis space | Shapes the demonstration/prompt space |
-| Domain knowledge extracts signal | Domain knowledge tags examples |
-| Bad features = blind model | Bad data = blind optimizer |
+| Shapes the hypothesis space      | Shapes the demonstration/prompt space            |
+| Domain knowledge extracts signal | Domain knowledge tags examples                   |
+| Bad features = blind model       | Bad data = blind optimizer                       |
 
 ## Why This Matters for GEPA
 
@@ -65,12 +65,14 @@ The broader intuition: **GEPA can only reflect on failures it sees.** If your da
 ## What "Features" Mean in Each World
 
 **Traditional ML features:**
+
 - Age from birthdate
 - TF-IDF from text
 - Ratios and interactions
 - PCA components
 
 **Data curation "features" (meta-characteristics):**
+
 - Complexity tier (simple vs multi-hop reasoning)
 - Domain cluster
 - Edge case vs typical
@@ -86,11 +88,11 @@ In traditional ML, feature engineering is where human domain knowledge shapes wh
 
 I see a similar pattern emerging with LLM optimization:
 
-| Traditional ML | DSPy + GEPA |
-|----------------|-------------|
-| Feature engineering | Data curation |
-| Loss function design | Metric + feedback function |
-| Model architecture | Module/signature design |
+| Traditional ML        | DSPy + GEPA                                  |
+| --------------------- | -------------------------------------------- |
+| Feature engineering   | Data curation                                |
+| Loss function design  | Metric + feedback function                   |
+| Model architecture    | Module/signature design                      |
 | Hyperparameter tuning | Optimizer config (auto="light/medium/heavy") |
 
 Data curation seems to be where your judgment shapes the optimizer's search space.
@@ -103,15 +105,15 @@ GEPA also has a second human-in-the-loop component: the feedback function. GEPA'
 
 Feature engineering has a well-established toolkit. I suspect data curation could have an analogous one.
 
-| Feature Engineering | Possible Data Curation Analog |
-|---------------------|------------------------------|
-| Imputation (fill missing values) | Synthetic example generation (fill coverage gaps) |
-| Normalization (common scale) | Difficulty calibration (balanced complexity distribution) |
-| Binning (continuous → discrete) | Stratification tags (bucket by complexity, domain, capability) |
-| One-hot encoding | Multi-label tagging (is_edge_case, requires_math, multi_hop) |
-| Feature selection (drop irrelevant) | Example pruning (remove noisy, mislabeled, redundant) |
-| Outlier handling | Edge case curation (deliberately include or exclude extremes) |
-| Dimensionality reduction | Embedding-based deduplication (remove near-duplicates) |
+| Feature Engineering                 | Possible Data Curation Analog                                  |
+| ----------------------------------- | -------------------------------------------------------------- |
+| Imputation (fill missing values)    | Synthetic example generation (fill coverage gaps)              |
+| Normalization (common scale)        | Difficulty calibration (balanced complexity distribution)      |
+| Binning (continuous → discrete)     | Stratification tags (bucket by complexity, domain, capability) |
+| One-hot encoding                    | Multi-label tagging (is_edge_case, requires_math, multi_hop)   |
+| Feature selection (drop irrelevant) | Example pruning (remove noisy, mislabeled, redundant)          |
+| Outlier handling                    | Edge case curation (deliberately include or exclude extremes)  |
+| Dimensionality reduction            | Embedding-based deduplication (remove near-duplicates)         |
 
 ### Techniques I'm thinking about for LLM optimization
 
@@ -124,7 +126,7 @@ medium = [ex for ex, _, score in results if 0.5 < score <= 0.9]
 hard = [ex for ex, _, score in results if score <= 0.5]
 ```
 
-**Failure mode tagging.** Beyond just scoring, categorize *why* things fail.
+**Failure mode tagging.** Beyond just scoring, categorize _why_ things fail.
 
 ```python
 def tag_failure(example, prediction, trace):
@@ -224,12 +226,12 @@ The signatures, the module structure, the control flow — once you've figured o
 
 This seems to map to traditional ML:
 
-| Traditional ML | DSPy + GEPA |
-|----------------|-------------|
-| Model architecture (fixed) | Program structure (fixed) |
-| Training data (grows) | Training data (grows) |
-| Hyperparameters (tweaked) | Optimizer config (tweaked) |
-| Feature engineering (iterated) | Data curation (iterated) |
+| Traditional ML                 | DSPy + GEPA                |
+| ------------------------------ | -------------------------- |
+| Model architecture (fixed)     | Program structure (fixed)  |
+| Training data (grows)          | Training data (grows)      |
+| Hyperparameters (tweaked)      | Optimizer config (tweaked) |
+| Feature engineering (iterated) | Data curation (iterated)   |
 
 The program is the scaffold. The data is what learns. At least, that's my current thinking.
 
@@ -243,4 +245,4 @@ Maybe that's the new feature engineering. I'll report back once I've tested this
 
 ---
 
-*This is Part 2 of my GEPA journey. Part 1: [Non-Obvious Things I Learned About GEPA](/posts/non-obvious-things-about-gepa)*
+_This is Part 2 of my GEPA journey. Part 1: [Non-Obvious Things I Learned About GEPA](/posts/non-obvious-things-about-gepa)_

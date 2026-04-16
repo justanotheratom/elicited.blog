@@ -97,14 +97,16 @@ const shouldLoadAnalytics = process.env.VERCEL === "1";
     />
 
     {/* Enable Markdown auto-discovery for AI crawlers */}
-    {markdownURL && (
-      <link
-        rel="alternate"
-        type="text/markdown"
-        title={`${title} (Markdown)`}
-        href={markdownURL}
-      />
-    )}
+    {
+      markdownURL && (
+        <link
+          rel="alternate"
+          type="text/markdown"
+          title={`${title} (Markdown)`}
+          href={markdownURL}
+        />
+      )
+    }
 
     <meta name="theme-color" content={themeColors.light} />
 
@@ -123,7 +125,9 @@ const shouldLoadAnalytics = process.env.VERCEL === "1";
     <script is:inline>
       (() => {
         let theme = "";
-        const metaThemeColor = document.querySelector("meta[name='theme-color']");
+        const metaThemeColor = document.querySelector(
+          "meta[name='theme-color']"
+        );
 
         try {
           theme = localStorage.getItem("theme") || "";
