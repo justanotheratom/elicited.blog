@@ -7,13 +7,7 @@ interface StringTitleProp {
   pageDesc?: string;
 }
 
-interface ArrayTitleProp {
-  pageTitle: [string, string];
-  titleTransition: string;
-  pageDesc?: string;
-}
-
-export type Props = StringTitleProp | ArrayTitleProp;
+export type Props = StringTitleProp;
 
 const { props } = Astro;
 
@@ -26,18 +20,7 @@ const backUrl = SITE.showBackButton ? Astro.url.pathname : "/";
   id="main-content"
   class="mx-auto w-full max-w-app px-4 pb-4"
 >
-  {
-    "titleTransition" in props ? (
-      <h1 class="text-2xl font-semibold sm:text-3xl">
-        {props.pageTitle[0]}
-        <span transition:name={props.titleTransition}>
-          {props.pageTitle[1]}
-        </span>
-      </h1>
-    ) : (
-      <h1 class="text-2xl font-semibold sm:text-3xl">{props.pageTitle}</h1>
-    )
-  }
+  <h1 class="text-2xl font-semibold sm:text-3xl">{props.pageTitle}</h1>
   <p class="mt-2 mb-6 italic">{props.pageDesc}</p>
   <slot />
 </main>
@@ -53,12 +36,9 @@ const backUrl = SITE.showBackButton ? Astro.url.pathname : "/";
     },
   };
 
-  document.addEventListener("astro:page-load", () => {
-    const mainContent: HTMLElement | null =
-      document.querySelector("#main-content");
-    const backUrl = mainContent?.dataset?.backurl;
-    if (backUrl) {
-      safeSession.set("backUrl", backUrl);
-    }
-  });
+  const mainContent: HTMLElement | null = document.querySelector("#main-content");
+  const backUrl = mainContent?.dataset?.backurl;
+  if (backUrl) {
+    safeSession.set("backUrl", backUrl);
+  }
 </script>

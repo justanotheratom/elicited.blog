@@ -1,5 +1,4 @@
 ---
-import { ClientRouter } from "astro:transitions";
 import { PUBLIC_GOOGLE_SITE_VERIFICATION } from "astro:env/client";
 import { SITE } from "@/config";
 import Analytics from "@vercel/analytics/astro";
@@ -30,6 +29,11 @@ const {
 } = Astro.props;
 
 const socialImageURL = new URL(ogImage, Astro.url);
+const themeColors = {
+  light: "#fdfdfd",
+  dark: "#212737",
+} as const;
+const shouldLoadAnalytics = process.env.VERCEL === "1";
 ---
 
 <!doctype html>
@@ -102,7 +106,7 @@ const socialImageURL = new URL(ogImage, Astro.url);
       />
     )}
 
-    <meta name="theme-color" content="" />
+    <meta name="theme-color" content={themeColors.light} />
 
     {
       // If PUBLIC_GOOGLE_SITE_VERIFICATION is set in the environment variable,
@@ -116,13 +120,35 @@ const socialImageURL = new URL(ogImage, Astro.url);
       )
     }
 
-    <ClientRouter />
+    <script is:inline>
+      (() => {
+        var theme = "";
+        var metaThemeColor = document.querySelector("meta[name='theme-color']");
 
-    <script is:inline src="/toggle-theme.js"></script>
+        try {
+          theme = localStorage.getItem("theme") || "";
+        } catch (error) {}
+
+        if (!theme) {
+          theme = window.matchMedia("(prefers-color-scheme: dark)").matches
+            ? "dark"
+            : "light";
+        }
+
+        document.documentElement.setAttribute("data-theme", theme);
+        if (metaThemeColor) {
+          metaThemeColor.setAttribute(
+            "content",
+            theme === "dark" ? "#212737" : "#fdfdfd"
+          );
+        }
+      })();
+    </script>
   </head>
   <body>
     <slot />
-    <Analytics />
+    <script is:inline defer src="/toggle-theme.js"></script>
+    {shouldLoadAnalytics && <Analytics />}
   </body>
 </html>
 

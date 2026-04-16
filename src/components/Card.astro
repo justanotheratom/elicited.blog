@@ -1,5 +1,4 @@
 ---
-import { slugifyStr } from "@/utils/slugify";
 import type { CollectionEntry } from "astro:content";
 import { getPath } from "@/utils/getPath";
 import Datetime from "./Datetime.astro";
@@ -11,11 +10,7 @@ export interface Props extends CollectionEntry<"blog"> {
 const { variant = "h2", data, id, filePath } = Astro.props;
 
 const { title, description, pubDatetime, modDatetime, timezone } = data;
-
-const headerProps = {
-  style: { viewTransitionName: slugifyStr(title) },
-  class: "text-lg font-medium decoration-dashed hover:underline",
-};
+const HeadingTag = variant;
 ---
 
 <li class="my-6">
@@ -23,13 +18,9 @@ const headerProps = {
     href={getPath(id, filePath)}
     class="inline-block text-lg font-medium text-accent decoration-dashed underline-offset-4 focus-visible:no-underline focus-visible:underline-offset-0"
   >
-    {
-      variant === "h2" ? (
-        <h2 {...headerProps}>{title}</h2>
-      ) : (
-        <h3 {...headerProps}>{title}</h3>
-      )
-    }
+    <HeadingTag class="text-lg font-medium decoration-dashed hover:underline">
+      {title}
+    </HeadingTag>
   </a>
   <Datetime {pubDatetime} {modDatetime} {timezone} />
   <p>{description}</p>

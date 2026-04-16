@@ -134,10 +134,7 @@ const nextPost =
     ]}
     data-pagefind-body
   >
-    <h1
-      transition:name={slugifyStr(title)}
-      class="inline-block text-2xl font-bold text-accent sm:text-3xl"
-    >
+    <h1 class="inline-block text-2xl font-bold text-accent sm:text-3xl">
       {title}
     </h1>
     <div class="my-2 flex items-center gap-2">
@@ -207,10 +204,12 @@ const nextPost =
   <Footer />
 </Layout>
 
-<script is:inline data-astro-rerun>
+<script is:inline>
   /** Create a progress indicator
    *  at the top */
   function createProgressBar() {
+    if (document.querySelector(".progress-container")) return;
+
     // Create the main container div
     const progressContainer = document.createElement("div");
     progressContainer.className =
@@ -232,7 +231,9 @@ const nextPost =
   /** Update the progress bar
    *  when user scrolls */
   function updateScrollProgress() {
-    document.addEventListener("scroll", () => {
+    let ticking = false;
+
+    const handleScroll = () => {
       const winScroll =
         document.body.scrollTop || document.documentElement.scrollTop;
       const height =
@@ -245,7 +246,19 @@ const nextPost =
           myBar.style.width = scrolled + "%";
         }
       }
-    });
+    };
+
+    document.addEventListener("scroll", () => {
+      if (ticking) return;
+
+      ticking = true;
+      window.requestAnimationFrame(() => {
+        handleScroll();
+        ticking = false;
+      });
+    }, { passive: true });
+
+    handleScroll();
   }
   updateScrollProgress();
 
@@ -261,6 +274,8 @@ const nextPost =
       link.className =
         "heading-link ms-2 no-underline opacity-75 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100";
       link.href = "#" + heading.id;
+      link.setAttribute("aria-label", `Link to section: ${heading.textContent?.trim() ?? heading.id}`);
+      link.title = `Link to ${heading.textContent?.trim() ?? heading.id}`;
 
       const span = document.createElement("span");
       span.ariaHidden = "true";
@@ -321,9 +336,4 @@ const nextPost =
     }
   }
   attachCopyButtons();
-
-  /* Go to page start after page swap */
-  document.addEventListener("astro:after-swap", () =>
-    window.scrollTo({ left: 0, top: 0, behavior: "instant" })
-  );
 </script>

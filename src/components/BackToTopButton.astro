@@ -32,7 +32,7 @@ import IconArrowNarrowUp from "@/assets/icons/IconArrowNarrowUp.svg";
   </button>
 </div>
 
-<script is:inline data-astro-rerun>
+<script is:inline>
   /** Scrolls the document to the top when
    * the "Back to Top" button is clicked. */
   function backToTop() {
@@ -82,7 +82,9 @@ import IconArrowNarrowUp from "@/assets/icons/IconArrowNarrowUp.svg";
         });
         ticking = true;
       }
-    });
+    }, { passive: true });
+
+    handleScroll();
   }
   backToTop();
 </script>

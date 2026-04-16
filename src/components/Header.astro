@@ -142,13 +142,15 @@ const isActive = (path: string) => {
 
 <script>
   function toggleNav() {
-    const menuBtn = document.querySelector("#menu-btn");
+    const menuBtn = document.querySelector<HTMLButtonElement>("#menu-btn");
     const menuItems = document.querySelector("#menu-items");
     const menuIcon = document.querySelector("#menu-icon");
     const closeIcon = document.querySelector("#close-icon");
 
     if (!menuBtn || !menuItems || !menuIcon || !closeIcon) return;
+    if (menuBtn.dataset.navBound === "true") return;
 
+    menuBtn.dataset.navBound = "true";
     menuBtn.addEventListener("click", () => {
       const openMenu = menuBtn.getAttribute("aria-expanded") === "true";
 
@@ -162,7 +164,4 @@ const isActive = (path: string) => {
   }
 
   toggleNav();
-
-  // Runs on view transitions navigation
-  document.addEventListener("astro:after-swap", toggleNav);
 </script>

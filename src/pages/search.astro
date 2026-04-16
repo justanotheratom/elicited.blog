@@ -12,7 +12,7 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
 <Layout title={`Search | ${SITE.title}`}>
   <Header />
   <Main pageTitle="Search" pageDesc="Search any article ...">
-    <div id="pagefind-search" transition:persist data-backurl={backUrl}></div>
+    <div id="pagefind-search" data-backurl={backUrl}></div>
   </Main>
   <Footer />
 </Layout>
@@ -32,7 +32,8 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
     const pageFindSearch: HTMLElement | null =
       document.querySelector("#pagefind-search");
 
-    if (!pageFindSearch) return;
+    if (!pageFindSearch || pageFindSearch.dataset.pagefindInit === "true") return;
+    pageFindSearch.dataset.pagefindInit = "true";
 
     const params = new URLSearchParams(window.location.search);
 
@@ -90,14 +91,6 @@ const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
     });
   }
 
-  document.addEventListener("astro:after-swap", () => {
-    const pagefindSearch = document.querySelector("#pagefind-search");
-
-    // if pagefind search form already exists, don't initialize search component
-    if (pagefindSearch && pagefindSearch.querySelector("form")) return;
-
-    initSearch();
-  });
   initSearch();
 </script>
 
