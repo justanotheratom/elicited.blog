@@ -46,5 +46,8 @@ jobs:
       - name: "📝 Checking code format"
         run: pnpm run format:check
 
+      - name: "📚 Content quality checks"
+        run: pnpm run content:check
+
       - name: "🚀 Build the project"
         run: pnpm run build

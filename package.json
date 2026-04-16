@@ -8,6 +8,7 @@
     "preview": "astro preview",
     "sync": "astro sync",
     "astro": "astro",
+    "content:check": "astro check && node scripts/content-check.mjs",
     "format:check": "prettier --check .",
     "format": "prettier --write .",
     "lint": "eslint ."
