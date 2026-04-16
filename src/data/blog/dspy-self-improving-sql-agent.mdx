@@ -13,7 +13,7 @@ tags:
   - architecture
 ---
 
-*AI-generated entry. See [What & Why](/posts/what-and-why) for context.*
+_AI-generated entry. See [What & Why](/posts/what-and-why) for context._
 
 # Building a Self-Improving SQL Agent with Pure DSPy
 
@@ -25,7 +25,7 @@ This post shows how to build the same thing using pure DSPy. No external orchest
 
 [Agno](https://github.com/agno-agi/agno) is a unified stack for multi-agent systems—framework, runtime, and control plane in one. It's fast (529x faster agent instantiation than LangGraph), includes memory and knowledge management, guardrails, human-in-the-loop, and AgentOS for production deployments. It's a serious framework with 36k GitHub stars.
 
-But Agno is a different abstraction level. It orchestrates agents. DSPy *programs* them.
+But Agno is a different abstraction level. It orchestrates agents. DSPy _programs_ them.
 
 DSPy's value proposition is different:
 
@@ -58,6 +58,7 @@ User Question
 ```
 
 The agent has access to four tools:
+
 1. **`get_schema()`** - returns database table and column information
 2. **`execute_query(sql)`** - runs a SQL query and returns results
 3. **`search_knowledge_base(question)`** - finds similar past questions via `dspy.Retrieve`
@@ -154,6 +155,7 @@ The `trajectory` field contains the full reasoning trace: every thought, tool ca
 Here's where DSPy's design shines. Most frameworks treat retrieval as an afterthought—something you bolt on with a separate vector database. DSPy treats retrieval as a first-class concept, parallel to language modeling.
 
 DSPy has two core abstractions:
+
 - **LM** (Language Model) - generates text
 - **RM** (Retriever Model) - retrieves relevant passages
 
@@ -370,15 +372,15 @@ print(result.answer)
 
 ## Comparison with Agno Approach
 
-| Aspect | Agno | DSPy |
-|--------|------|------|
-| **Core abstraction** | Agent orchestration | Optimizable programs |
-| **Agent logic** | Framework orchestration | Built-in `dspy.ReAct` |
-| **Knowledge base** | PgVector + custom search | `dspy.Retrieve` + RM interface |
-| **Prompt optimization** | Manual | `optimizer.compile()` on your data |
-| **Tools** | Framework-specific | Plain Python functions |
-| **Production infra** | AgentOS (runtime + control plane) | Bring your own (FastAPI, etc.) |
-| **Monitoring** | Built-in control plane | Integrate with your observability stack |
+| Aspect                  | Agno                              | DSPy                                    |
+| ----------------------- | --------------------------------- | --------------------------------------- |
+| **Core abstraction**    | Agent orchestration               | Optimizable programs                    |
+| **Agent logic**         | Framework orchestration           | Built-in `dspy.ReAct`                   |
+| **Knowledge base**      | PgVector + custom search          | `dspy.Retrieve` + RM interface          |
+| **Prompt optimization** | Manual                            | `optimizer.compile()` on your data      |
+| **Tools**               | Framework-specific                | Plain Python functions                  |
+| **Production infra**    | AgentOS (runtime + control plane) | Bring your own (FastAPI, etc.)          |
+| **Monitoring**          | Built-in control plane            | Integrate with your observability stack |
 
 These aren't competing approaches—they solve different problems. Agno gives you production infrastructure out of the box: runtime, monitoring, deployment. DSPy gives you a programming model where the LLM behavior is tunable.
 

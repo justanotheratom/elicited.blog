@@ -24,8 +24,7 @@ import { SITE } from "@/config";
     get(key: string): string | null {
       try {
         return window?.sessionStorage?.getItem?.(key) ?? null;
-      } catch (error) {
-        console.warn("sessionStorage is unavailable:", error);
+      } catch {
         return null;
       }
     },

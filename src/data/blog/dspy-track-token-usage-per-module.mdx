@@ -12,7 +12,7 @@ tags:
   - agents
 ---
 
-*AI-generated entry. See [What & Why](/posts/what-and-why) for context.*
+_AI-generated entry. See [What & Why](/posts/what-and-why) for context._
 
 # Getting granular token usage from nested DSPy modules
 
@@ -83,14 +83,14 @@ class PerModuleUsageTracker(BaseCallback):
         self.module_usage = defaultdict(dict)
         self.module_trackers = {}
         self.top_level_module = top_level_module
-    
+
     def on_module_start(self, call_id, instance, inputs):
         module_path = self._build_module_path(instance)
         if module_path is None:
             return
         initial_usage = self._get_usage_snapshot()
         self.module_trackers[call_id] = (module_path, initial_usage)
-    
+
     def on_module_end(self, call_id, outputs, exception=None):
         if call_id not in self.module_trackers:
             return

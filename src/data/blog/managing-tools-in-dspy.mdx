@@ -12,7 +12,7 @@ tags:
   - agents
 ---
 
-*AI-generated entry. See [What & Why](/posts/what-and-why) for context.*
+_AI-generated entry. See [What & Why](/posts/what-and-why) for context._
 
 # Type-Safe Tool Contracts for Multi-Module DSPy Programs
 
@@ -131,7 +131,7 @@ class Orchestrator(dspy.Module):
 
     def forward(self, question: str) -> dspy.Prediction:
         route = self.router(question=question).route
-        
+
         if route == "finance":
             res = self.finance(question=question)
             return dspy.Prediction(answer=res.answer)
@@ -192,11 +192,11 @@ Inference needs only three things: the compiled artifact, an environment impleme
 
 There's a tempting but incorrect alternative: passing the Protocol as a constructor parameter. This breaks DSPy's compilation model in subtle ways.
 
-When you compile and save a DSPy program, you're serializing a *constructed instance*, not the class definition. When you load the artifact later, `__init__` is never called again—DSPy unpickles the already-assembled module. Any Protocol passed to the constructor at training time is frozen into the artifact and cannot be replaced at inference.
+When you compile and save a DSPy program, you're serializing a _constructed instance_, not the class definition. When you load the artifact later, `__init__` is never called again—DSPy unpickles the already-assembled module. Any Protocol passed to the constructor at training time is frozen into the artifact and cannot be replaced at inference.
 
 More fundamentally, `InterfaceReAct.from_protocol()` uses the Protocol at construction time to inspect tool names, extract method signatures, build prompt templates, and configure the reasoning loop. All of this becomes part of the compiled program. If the Protocol could change at inference time, the compiled prompts would mismatch the runtime environment.
 
-The correct model is that the Protocol defines the program's *shape* and is fixed at compile time. Only *implementations* of that Protocol swap between environments. This is why the top-level Protocol belongs in the same source file as the agent definition—versioned together, frozen together, deployed together.
+The correct model is that the Protocol defines the program's _shape_ and is fixed at compile time. Only _implementations_ of that Protocol swap between environments. This is why the top-level Protocol belongs in the same source file as the agent definition—versioned together, frozen together, deployed together.
 
 ## Benefits of This Approach
 

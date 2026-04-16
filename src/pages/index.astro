@@ -41,8 +41,8 @@ const recentPosts = sortedPosts.filter(({ data }) => !data.featured);
       </a>
 
       <p>
-        A collection of Blog Posts elicited from my AI. Me and my AI collaborate to create Content that
-        neither of us could create alone.
+        A collection of Blog Posts elicited from my AI. Me and my AI collaborate
+        to create Content that neither of us could create alone.
       </p>
     </section>
 
@@ -93,9 +93,7 @@ const recentPosts = sortedPosts.filter(({ data }) => !data.featured);
     set(key: string, value: string): void {
       try {
         window?.sessionStorage?.setItem?.(key, value);
-      } catch (error) {
-        console.warn("sessionStorage is unavailable:", error);
-      }
+      } catch {}
     },
   };
 
