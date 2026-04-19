@@ -15,6 +15,7 @@ Now I'm on my own. When GPT dropped, something clicked. I've been building at th
 
 - [IngrediCheck](https://www.ingredicheck.app/) — Personalized Food Scanner App.
 - [KIN Calendar](https://www.kincalendar.com/) — A Delightful Family Calendar App.
+- [MUFFLER](https://www.muffler.app/) — Noise Blocker for your X Feed.
 
 ## What I Write About
 
