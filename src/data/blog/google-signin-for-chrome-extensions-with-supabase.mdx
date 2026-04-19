@@ -45,6 +45,10 @@ Once I stopped treating the website as the source of truth for extension auth, e
 
 Chrome's identity API is what makes this shape work: it gives you a redirect URL under `https://<app-id>.chromiumapp.org/*`, and `launchWebAuthFlow()` resolves when the provider returns there.
 
+### Sequence diagram: extension Google sign-in
+
+![Sequence diagram showing the Google sign-in flow for the Chrome extension. The user starts in the extension, Supabase returns the OAuth URL, Chrome opens Google in a web auth flow, Supabase redirects through the website relay page, and the extension exchanges the returned code for a session.](/assets/chrome-extension-google-signin-sequence.svg)
+
 ## Why this shape is less brittle
 
 The common failure mode is mixing responsibilities:
@@ -172,6 +176,10 @@ If you want continuity on the website, solve it explicitly and one-way:
 In Muffler, that is a `POST /v1/me/handoffs` followed by `POST /v1/session/website-handoff/redeem`, and then the website calls `supabase.auth.setSession(...)`.
 
 The important part is not the exact endpoint design. The important part is the direction of truth: extension auth stays extension-owned, and the website only inherits that state when the extension asks it to.
+
+### Sequence diagram: extension -> website handoff
+
+![Sequence diagram showing the extension-to-website handoff. The extension asks the backend to create a one-time handoff, opens the website with that token, the website redeems it with the backend, restores the Supabase session, and redirects the user into the app.](/assets/chrome-extension-website-handoff-sequence.svg)
 
 ## The short version
 
