@@ -31,7 +31,11 @@ const months = [
 ];
 ---
 
-<Layout title={`Archives | ${SITE.title}`}>
+<Layout
+  title={`Archives | ${SITE.title}`}
+  description={`Browse the published archive on ${SITE.title} by month and year.`}
+  robots="noindex,follow"
+>
   <Header />
   <Main pageTitle="Archives" pageDesc="All the articles I've archived.">
     {

@@ -1,6 +1,7 @@
 ---
 layout: ../layouts/AboutLayout.astro
 title: "About"
+description: "Learn more about Sanket Patel, his background in systems engineering, and the work behind Elicited."
 ---
 
 I'm a Systems Software Engineer turned Indie Builder, currently crafting consumer mobile apps and exploring what's possible at the edge of AI.

@@ -12,17 +12,60 @@ import {
 import { transformerFileName } from "./src/utils/transformers/fileName";
 import { SITE } from "./src/config";
 
+const remarkDemoteBodyH1 = () => {
+  return (tree: { type?: string; depth?: number; children?: unknown[] }) => {
+    const visit = (node: typeof tree) => {
+      if (!node || typeof node !== "object") return;
+
+      if (node.type === "heading" && node.depth === 1) {
+        node.depth = 2;
+      }
+
+      if (Array.isArray(node.children)) {
+        node.children.forEach(child => visit(child as typeof tree));
+      }
+    };
+
+    visit(tree);
+  };
+};
+
+const getSitemapPathname = (page: string) =>
+  new URL(page, SITE.website).pathname.replace(/\/+$/, "/");
+
+const shouldIncludeInSitemap = (page: string) => {
+  const pathname = getSitemapPathname(page);
+
+  if (pathname === "/search/" || pathname === "/archives/") {
+    return false;
+  }
+
+  if (/^\/posts\/\d+\/$/.test(pathname)) {
+    return false;
+  }
+
+  if (/^\/tags\/[^/]+\/\d+\/$/.test(pathname)) {
+    return false;
+  }
+
+  return true;
+};
+
 // https://astro.build/config
 export default defineConfig({
   site: SITE.website,
   integrations: [
     sitemap({
-      filter: page => SITE.showArchives || !page.endsWith("/archives"),
+      filter: shouldIncludeInSitemap,
     }),
     mdx(),
   ],
   markdown: {
-    remarkPlugins: [remarkToc, [remarkCollapse, { test: "Table of contents" }]],
+    remarkPlugins: [
+      remarkToc,
+      remarkDemoteBodyH1,
+      [remarkCollapse, { test: "Table of contents" }],
+    ],
     shikiConfig: {
       // For more themes, visit https://shiki.style/themes
       themes: { light: "min-light", dark: "night-owl" },

@@ -58,6 +58,9 @@ const ogImage = ogImageUrl
 
 // Markdown URL for AI crawlers
 const markdownURL = `${getPath(post.id, post.filePath)}/index.md`;
+const resolvedCanonicalURL =
+  canonicalURL ||
+  new URL(getPath(post.id, post.filePath), Astro.url.origin).href;
 
 const layoutProps = {
   title: `${title} | ${SITE.title}`,
@@ -65,17 +68,13 @@ const layoutProps = {
   description,
   pubDatetime,
   modDatetime,
-  canonicalURL,
+  canonicalURL: resolvedCanonicalURL,
   ogImage,
   scrollSmooth: true,
   markdownURL,
 };
 
 /* ========== Structured Data (Schema.org JSON-LD) ========== */
-
-const articleUrl =
-  canonicalURL ||
-  new URL(getPath(post.id, post.filePath), Astro.url.origin).href;
 
 const structuredData = {
   "@context": "https://schema.org",
@@ -105,7 +104,7 @@ const structuredData = {
   },
   mainEntityOfPage: {
     "@type": "WebPage",
-    "@id": articleUrl,
+    "@id": resolvedCanonicalURL,
   },
 };
 

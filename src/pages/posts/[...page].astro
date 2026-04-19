@@ -16,9 +16,20 @@ export const getStaticPaths = (async ({ paginate }) => {
 }) satisfies GetStaticPaths;
 
 const { page } = Astro.props;
+const isPaginatedPage = page.currentPage > 1;
+const pageTitle = isPaginatedPage
+  ? `Posts | Page ${page.currentPage} | ${SITE.title}`
+  : `Posts | ${SITE.title}`;
+const pageDescription = isPaginatedPage
+  ? `Page ${page.currentPage} of published articles on ${SITE.title}.`
+  : `Browse all published articles on ${SITE.title}.`;
 ---
 
-<Layout title={`Posts | ${SITE.title}`}>
+<Layout
+  title={pageTitle}
+  description={pageDescription}
+  robots={isPaginatedPage ? "noindex,follow" : undefined}
+>
   <Header />
   <Main pageTitle="Posts" pageDesc="All the articles I've posted.">
     <ul>

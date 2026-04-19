@@ -9,7 +9,11 @@ import { SITE } from "@/config";
 const backUrl = SITE.showBackButton ? `${Astro.url.pathname}` : "/";
 ---
 
-<Layout title={`Search | ${SITE.title}`}>
+<Layout
+  title={`Search | ${SITE.title}`}
+  description={`Search published articles on ${SITE.title}.`}
+  robots="noindex,follow"
+>
   <Header />
   <Main pageTitle="Search" pageDesc="Search any article ...">
     <div id="pagefind-search" data-backurl={backUrl}></div>

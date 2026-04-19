@@ -9,9 +9,10 @@ export interface Props {
   author?: string;
   description?: string;
   ogImage?: string;
-  canonicalURL?: string;
+  canonicalURL?: string | URL;
   pubDatetime?: Date;
   modDatetime?: Date | null;
+  robots?: string;
   scrollSmooth?: boolean;
   markdownURL?: string;
 }
@@ -24,11 +25,14 @@ const {
   canonicalURL = new URL(Astro.url.pathname, Astro.url),
   pubDatetime,
   modDatetime,
+  robots,
   scrollSmooth = false,
   markdownURL,
 } = Astro.props;
 
-const socialImageURL = new URL(ogImage, Astro.url);
+const resolvedCanonicalURL = new URL(canonicalURL.toString(), Astro.url);
+const canonicalHref = resolvedCanonicalURL.href;
+const socialImageURL = new URL(ogImage, Astro.url).href;
 const themeColors = {
   light: "#fdfdfd",
   dark: "#212737",
@@ -46,7 +50,7 @@ const shouldLoadAnalytics = process.env.VERCEL === "1";
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="canonical" href={canonicalURL} />
+    <link rel="canonical" href={canonicalHref} />
     <meta name="generator" content={Astro.generator} />
 
     <!-- General Meta Tags -->
@@ -54,12 +58,13 @@ const shouldLoadAnalytics = process.env.VERCEL === "1";
     <meta name="title" content={title} />
     <meta name="description" content={description} />
     <meta name="author" content={author} />
+    {robots && <meta name="robots" content={robots} />}
     <link rel="sitemap" href="/sitemap-index.xml" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content={canonicalURL} />
+    <meta property="og:url" content={canonicalHref} />
     <meta property="og:image" content={socialImageURL} />
 
     <!-- Article Published/Modified time -->
@@ -82,7 +87,7 @@ const shouldLoadAnalytics = process.env.VERCEL === "1";
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content={canonicalURL} />
+    <meta property="twitter:url" content={canonicalHref} />
     <meta property="twitter:title" content={title} />
     <meta property="twitter:description" content={description} />
     <meta property="twitter:image" content={socialImageURL} />
