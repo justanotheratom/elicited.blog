@@ -1,0 +1,437 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 1280 660"
+  role="img"
+  aria-labelledby="title desc"
+>
+  <title id="title">KIN local loopback voice test flow</title>
+  <desc id="desc">
+    A five-step diagram showing how the local test generates spoken audio, runs
+    the iOS app, routes audio through Loopback into the simulator microphone,
+    lets KIN and the backend process the request normally, and asserts the
+    resulting Supabase calendar event.
+  </desc>
+  <defs>
+    <marker
+      id="arrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="8"
+      markerHeight="8"
+      orient="auto-start-reverse"
+    >
+      <path d="M 0 0 L 10 5 L 0 10 z" />
+    </marker>
+    <style>
+      .bg {
+        fill: #f8fafc;
+      }
+      .title {
+        fill: #0f172a;
+        font:
+          700 34px ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        text-anchor: middle;
+      }
+      .subtitle {
+        fill: #475569;
+        font:
+          17px ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        text-anchor: middle;
+      }
+      .card {
+        fill: #ffffff;
+        stroke: #cbd5e1;
+        stroke-width: 2;
+      }
+      .card-audio {
+        fill: #ecfeff;
+        stroke: #0891b2;
+      }
+      .card-app {
+        fill: #f0fdf4;
+        stroke: #16a34a;
+      }
+      .card-assert {
+        fill: #fffbeb;
+        stroke: #d97706;
+      }
+      .step {
+        font:
+          700 16px ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        text-anchor: middle;
+      }
+      .step-circle {
+        fill: #0f172a;
+      }
+      .step-number {
+        fill: #ffffff;
+        font:
+          700 16px ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        text-anchor: middle;
+        dominant-baseline: middle;
+      }
+      .card-title {
+        fill: #0f172a;
+        font:
+          700 21px ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        text-anchor: middle;
+      }
+      .card-line {
+        fill: #475569;
+        font:
+          15px ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        text-anchor: middle;
+      }
+      .mono {
+        fill: #334155;
+        font:
+          14px ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          "Liberation Mono",
+          monospace;
+        text-anchor: middle;
+      }
+      .arrow {
+        stroke: #334155;
+        stroke-width: 2.5;
+        fill: none;
+        marker-end: url(#arrow);
+      }
+      .rail {
+        fill: #f1f5f9;
+        stroke: #cbd5e1;
+        stroke-width: 1.5;
+      }
+      .rail-label {
+        fill: #334155;
+        font:
+          700 14px ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        text-anchor: middle;
+      }
+      .rail-item {
+        fill: #ffffff;
+        stroke: #cbd5e1;
+        stroke-width: 1.5;
+      }
+      .rail-item-accent {
+        fill: #ecfeff;
+        stroke: #0891b2;
+      }
+      .rail-item-app {
+        fill: #f0fdf4;
+        stroke: #16a34a;
+      }
+      .rail-text {
+        fill: #334155;
+        font:
+          14px ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        text-anchor: middle;
+      }
+      .callout {
+        fill: #ffffff;
+        stroke: #e2e8f0;
+        stroke-width: 1.5;
+      }
+      .callout-text {
+        fill: #475569;
+        font:
+          15px ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        text-anchor: middle;
+      }
+      .callout-strong {
+        fill: #0f172a;
+        font-weight: 700;
+      }
+      #arrow path {
+        fill: #334155;
+      }
+      @media (prefers-color-scheme: dark) {
+        .bg {
+          fill: #020617;
+        }
+        .title,
+        .card-title,
+        .callout-strong {
+          fill: #f8fafc;
+        }
+        .subtitle,
+        .card-line,
+        .mono,
+        .rail-text,
+        .callout-text {
+          fill: #cbd5e1;
+        }
+        .card,
+        .rail-item,
+        .callout {
+          fill: #0f172a;
+          stroke: #334155;
+        }
+        .card-audio,
+        .rail-item-accent {
+          fill: #083344;
+          stroke: #06b6d4;
+        }
+        .card-app,
+        .rail-item-app {
+          fill: #052e16;
+          stroke: #22c55e;
+        }
+        .card-assert {
+          fill: #422006;
+          stroke: #f59e0b;
+        }
+        .step-circle {
+          fill: #e2e8f0;
+        }
+        .step-number {
+          fill: #020617;
+        }
+        .rail {
+          fill: #0f172a;
+          stroke: #334155;
+        }
+        .rail-label {
+          fill: #e2e8f0;
+        }
+        .arrow {
+          stroke: #cbd5e1;
+        }
+        #arrow path {
+          fill: #cbd5e1;
+        }
+      }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1280" height="660" rx="22" />
+
+  <text class="title" x="640" y="58">Local voice test path</text>
+  <text class="subtitle" x="640" y="90">
+    Automate the environment around KIN, then let the app and backend behave
+    normally.
+  </text>
+
+  <rect
+    class="card card-audio"
+    x="54"
+    y="150"
+    width="210"
+    height="210"
+    rx="14"
+  />
+  <circle class="step-circle" cx="94" cy="190" r="18" />
+  <text class="step-number" x="94" y="191">1</text>
+  <text class="step" x="159" y="196">fixture</text>
+  <text class="card-title" x="159" y="242">Generate speech</text>
+  <text class="card-line" x="159" y="279">unique command text</text>
+  <text class="mono" x="159" y="307">/usr/bin/say</text>
+  <text class="card-line" x="159" y="335">writes an AIFF file</text>
+
+  <rect class="card" x="294" y="150" width="210" height="210" rx="14" />
+  <circle class="step-circle" cx="334" cy="190" r="18" />
+  <text class="step-number" x="334" y="191">2</text>
+  <text class="step" x="399" y="196">app</text>
+  <text class="card-title" x="399" y="242">Run KIN locally</text>
+  <text class="card-line" x="399" y="279">FlowDeck launches</text>
+  <text class="card-line" x="399" y="307">the simulator app</text>
+  <text class="card-line" x="399" y="335">with local services</text>
+
+  <rect class="card" x="534" y="150" width="210" height="210" rx="14" />
+  <circle class="step-circle" cx="574" cy="190" r="18" />
+  <text class="step-number" x="574" y="191">3</text>
+  <text class="step" x="639" y="196">gesture</text>
+  <text class="card-title" x="639" y="242">Hold voice UI</text>
+  <text class="card-line" x="639" y="279">XCUITest presses</text>
+  <text class="mono" x="639" y="307">voice_assistant_bar</text>
+  <text class="card-line" x="639" y="335">for audio duration</text>
+
+  <rect
+    class="card card-audio"
+    x="774"
+    y="150"
+    width="210"
+    height="210"
+    rx="14"
+  />
+  <circle class="step-circle" cx="814" cy="190" r="18" />
+  <text class="step-number" x="814" y="191">4</text>
+  <text class="step" x="879" y="196">audio</text>
+  <text class="card-title" x="879" y="242">Route to mic</text>
+  <text class="card-line" x="879" y="279">helper calls afplay</text>
+  <text class="card-line" x="879" y="307">Loopback receives it</text>
+  <text class="card-line" x="879" y="335">Simulator sees a mic</text>
+
+  <rect
+    class="card card-app"
+    x="1014"
+    y="150"
+    width="210"
+    height="210"
+    rx="14"
+  />
+  <circle class="step-circle" cx="1054" cy="190" r="18" />
+  <text class="step-number" x="1054" y="191">5</text>
+  <text class="step" x="1119" y="196">product</text>
+  <text class="card-title" x="1119" y="242">Process normally</text>
+  <text class="card-line" x="1119" y="279">KIN records audio</text>
+  <text class="card-line" x="1119" y="307">backend transcribes</text>
+  <text class="card-line" x="1119" y="335">calendar state mutates</text>
+
+  <path class="arrow" d="M 264 255 H 294" />
+  <path class="arrow" d="M 504 255 H 534" />
+  <path class="arrow" d="M 744 255 H 774" />
+  <path class="arrow" d="M 984 255 H 1014" />
+
+  <rect class="rail" x="70" y="420" width="1140" height="92" rx="14" />
+  <text class="rail-label" x="640" y="448">
+    What actually travels through the system
+  </text>
+
+  <rect
+    class="rail-item rail-item-accent"
+    x="110"
+    y="466"
+    width="110"
+    height="30"
+    rx="15"
+  />
+  <text class="rail-text" x="165" y="486">text phrase</text>
+  <path class="arrow" d="M 224 481 H 247" />
+
+  <rect
+    class="rail-item rail-item-accent"
+    x="252"
+    y="466"
+    width="74"
+    height="30"
+    rx="15"
+  />
+  <text class="rail-text" x="289" y="486">say</text>
+  <path class="arrow" d="M 330 481 H 354" />
+
+  <rect
+    class="rail-item rail-item-accent"
+    x="359"
+    y="466"
+    width="108"
+    height="30"
+    rx="15"
+  />
+  <text class="rail-text" x="413" y="486">AIFF audio</text>
+  <path class="arrow" d="M 471 481 H 495" />
+
+  <rect
+    class="rail-item rail-item-accent"
+    x="500"
+    y="466"
+    width="88"
+    height="30"
+    rx="15"
+  />
+  <text class="rail-text" x="544" y="486">afplay</text>
+  <path class="arrow" d="M 592 481 H 616" />
+
+  <rect
+    class="rail-item rail-item-accent"
+    x="621"
+    y="466"
+    width="108"
+    height="30"
+    rx="15"
+  />
+  <text class="rail-text" x="675" y="486">Loopback</text>
+  <path class="arrow" d="M 733 481 H 757" />
+
+  <rect class="rail-item" x="762" y="466" width="128" height="30" rx="15" />
+  <text class="rail-text" x="826" y="486">Simulator mic</text>
+  <path class="arrow" d="M 894 481 H 918" />
+
+  <rect
+    class="rail-item rail-item-app"
+    x="923"
+    y="466"
+    width="58"
+    height="30"
+    rx="15"
+  />
+  <text class="rail-text" x="952" y="486">KIN</text>
+  <path class="arrow" d="M 985 481 H 1009" />
+
+  <rect
+    class="rail-item rail-item-app"
+    x="1014"
+    y="466"
+    width="88"
+    height="30"
+    rx="15"
+  />
+  <text class="rail-text" x="1058" y="486">Backend</text>
+  <path class="arrow" d="M 1106 481 H 1130" />
+
+  <rect
+    class="rail-item rail-item-app"
+    x="1135"
+    y="466"
+    width="74"
+    height="30"
+    rx="15"
+  />
+  <text class="rail-text" x="1172" y="486">DB</text>
+
+  <rect class="callout" x="222" y="555" width="836" height="58" rx="14" />
+  <text class="callout-text" x="640" y="580">
+    <tspan class="callout-strong">Primary assertion:</tspan>
+    poll local Supabase for the unique marker event.
+    <tspan class="callout-strong">UI copy is secondary.</tspan>
+  </text>
+</svg>
