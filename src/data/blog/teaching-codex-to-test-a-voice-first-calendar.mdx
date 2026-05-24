@@ -120,7 +120,7 @@ The app does not know the difference. From KIN's point of view, someone spoke in
 
 ### The local path
 
-![Flow diagram showing the local KIN voice test harness. Codex runs the local runner, FlowDeck launches the simulator, XCUITest holds the voice bar, a helper plays audio through Loopback, KIN records it from the simulator microphone, and the local backend mutates Supabase state.](/assets/kin-loopback-voice-test-flow.svg)
+![Five-step diagram showing the local KIN voice test path. The test generates spoken audio with say, runs KIN through FlowDeck, holds the voice UI with XCUITest, routes audio through Loopback into the simulator microphone, then lets KIN, the backend, and Supabase process the request normally.](/assets/kin-voice-test-flow.svg)
 
 ## Timing the long press
 
