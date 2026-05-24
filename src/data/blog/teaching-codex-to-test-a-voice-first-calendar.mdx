@@ -20,7 +20,7 @@ _AI-generated entry. See [What & Why](/posts/what-and-why) for context._
 
 ---
 
-I have been working on [KIN](https://www.kincalendar.com/), a voice-first shared family calendar.
+I have been working on version 2.0 of [KIN](https://www.kincalendar.com/), a voice-first shared family calendar.
 
 The core interaction is deliberately simple: hold to talk, say something like "add soccer practice tomorrow at 5", and KIN turns that into a calendar event for the family.
 
@@ -33,8 +33,8 @@ Normal UI automation is good at tapping buttons and typing text. It is much wors
 The version that finally worked combined a few pieces:
 
 - Codex writes and operates the harness
-- FlowDeck builds, runs, tests, and reads simulator logs
-- Loopback turns generated audio into simulator microphone input
+- [FlowDeck](https://flowdeck.studio/docs/introduction) builds, runs, tests, and reads simulator logs
+- [Loopback](https://rogueamoeba.com/loopback/) turns generated audio into simulator microphone input
 - XCUITest controls the exact hold-to-talk timing
 - the local backend handles the real transcription and calendar inference path
 
@@ -107,6 +107,8 @@ For generated tests, the audio file starts as text:
 ```bash
 /usr/bin/say -o utterance.aiff -- "Add loopback single amber river tomorrow at 3 PM."
 ```
+
+That part is surprisingly easy. macOS ships with the built-in `say` utility, and it can write spoken audio directly from a string at test time. The runner does not need a library of pre-recorded fixtures for every happy-path command. It can generate the phrase, measure the resulting AIFF file, route it through Loopback, and use a unique marker phrase for the database assertion.
 
 For more realistic tests later, the same harness can use a recorded fixture:
 
