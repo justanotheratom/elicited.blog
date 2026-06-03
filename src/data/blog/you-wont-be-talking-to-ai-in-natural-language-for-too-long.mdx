@@ -1,0 +1,286 @@
+---
+title: "You won't be talking to AI in natural language for too long"
+description: "Natural language will make AI accessible. Expert language will make it powerful."
+pubDatetime: 2026-06-03T00:00:00Z
+modDatetime: 2026-06-03T00:00:00Z
+author: "Sanket Patel"
+featured: false
+draft: false
+tags:
+  - ai
+  - interfaces
+  - language
+  - prompting
+---
+
+# You won't be talking to AI in natural language for too long.
+
+_Natural language will make AI accessible. Expert language will make it powerful._
+
+Of course, that title is a little wrong.
+
+We will still be using language. We will still be talking to models, agents, computers, and whatever else this interface becomes. The point is narrower: we will not be using ordinary, casual, everyday natural language for serious work for very long.
+
+That was the first promise of the AI interface: no syntax, no API docs, no compiler errors, no ceremony. Just say what you want.
+
+That promise is real. It is also incomplete.
+
+Natural language is the on-ramp. It is not the highway.
+
+As the work gets more complex, the highest-leverage users will not be the ones who type the most English. They will be the ones who can compress the most intent into the fewest, clearest, most domain-specific words.
+
+They will operate at higher semantic altitude.
+
+## The old semantic gap
+
+Computer architecture has been here before.
+
+In the earlier processor architecture wars, one of the tensions was the "semantic gap": the distance between what a programmer wanted to express and what the hardware actually executed.
+
+Complex instruction set computers tried, in part, to narrow that gap. Give the programmer or compiler richer instructions. Encode more meaning into the instruction set. Let one machine instruction do something that might otherwise require a longer sequence of lower-level operations.
+
+Reduced instruction set computers went the other way. RISC argued that simpler, regular instructions could make the whole machine faster, easier to pipeline, easier to optimize, and easier to implement. Patterson and Ditzel's classic RISC paper framed the argument as a rejection of the trend toward ever more complex machines.[^patterson-ditzel] Patterson later described the early RISC work as going against the conventional wisdom of adding complicated instructions to close the semantic gap between high-level languages and hardware.[^riscy-history]
+
+The clean version of the story is tempting:
+
+CISC chose high semantic meaning in the instruction set. RISC chose lower-level simplicity. CISC won the first commercial round through x86. RISC later came back through ARM and won the low-power world.
+
+But that story is too clean.
+
+ARM did dominate mobile and low-power devices. x86 did dominate PCs and servers. But modern chips are not morality plays about instruction sets. A 2013 HPCA paper comparing ARM and x86 found that modern performance and energy differences are dominated by implementation choices: microarchitecture, process technology, power targets, compilers, caches, and product design. The authors concluded that RISC vs CISC, as an ISA distinction, was largely irrelevant to energy efficiency in mature modern processors.[^power-struggles]
+
+That caveat matters, because the useful lesson is not "simple always beats complex" or "high-level always beats low-level."
+
+The useful lesson is that abstraction is a moving boundary.
+
+Sometimes meaning belongs in hardware. Sometimes it belongs in the compiler. Sometimes it belongs in the programming language. Sometimes it belongs in libraries, frameworks, tools, protocols, or naming conventions.
+
+The fight is never really over abstraction itself. The fight is over where meaning should live.
+
+## Abstraction kept moving up
+
+Programming languages repeated the same pattern one layer higher.
+
+Assembly made the machine explicit. C made the machine more tractable. C++ and Java gave more structure to large systems. Scripting languages made glue work faster. Python, JavaScript, Ruby, SQL, notebooks, frameworks, and low-code tools kept lifting more of the programmer's attention away from registers, memory addresses, and instruction sequencing.
+
+Brooks called high-level languages one of the most powerful improvements in software productivity because they remove accidental complexity: the bits, registers, branches, and concrete machine details that do not belong to the essence of the program.[^brooks] Ousterhout made a related argument about scripting languages, arguing that they trade low-level construction for higher-level composition and faster application development.[^ousterhout]
+
+But higher-level languages did not eliminate expertise.
+
+They moved it.
+
+A programmer no longer had to remember which register held which value, but they did have to understand data structures, types, concurrency, APIs, distributed systems, product constraints, testing, security, and operations.
+
+When the language got higher, the expert did not disappear. The expert started thinking at a different altitude.
+
+This is the part we keep missing with AI.
+
+## Natural language feels like the final layer
+
+LLMs make it feel like the interface has finally reached the top.
+
+No syntax. No keywords. No function signatures. No formal grammar. You can ask for a spreadsheet formula, a migration plan, a legal summary, a React component, a pitch deck, a poem, a data model, or a debugging strategy in ordinary English.
+
+That is a profound change. GPT-3's few-shot learning paper made the basic mechanism visible: tasks could be specified through text interaction and examples rather than model retraining.[^few-shot] The prompt became a temporary interface to capability.
+
+So it is natural to conclude that natural language is the holy grail.
+
+I think that is only true for low-altitude work.
+
+If the task is shallow, everyday language is enough:
+
+"Write me a thank-you note."
+
+"Summarize this article."
+
+"Make this button blue."
+
+"Generate a Python script that renames these files."
+
+The model can infer a lot because the stakes are low, the search space is familiar, and the acceptable output range is wide.
+
+But serious work is not like that.
+
+Serious work contains hidden constraints. It depends on unstated standards. It has failure modes that only show up after deployment. It requires knowing which details matter, which details are irrelevant, and which details sound reasonable but are actually traps.
+
+Plain English becomes verbose at exactly the moment precision starts to matter.
+
+## Expert language is semantic compression
+
+Consider this prompt:
+
+> Make sure that, whenever a job runs, we can tell where it started from, who triggered it, what settings were passed in, and what changed later. In the future, if something breaks, we want to be able to trace it back and understand what happened.
+
+That is fine.
+
+But an expert can say:
+
+> Jobs should persist provenance metadata.
+
+That phrase is not shorter because it is fancier. It is shorter because it is denser.
+
+"Provenance metadata" carries a whole bundle of expectations: source, actor, timestamp, parameters, lineage, auditability, reproducibility, accountability, debugging, and root-cause analysis.
+
+The model may understand both prompts. But the second prompt gives it a sharper coordinate in the space of possible solutions.
+
+This is the new leverage.
+
+Expert language is not decoration. It is compression.
+
+When a security person says "least privilege," they are not merely using jargon. They are naming a design principle, a threat model, and a review criterion.
+
+When a distributed systems person says "idempotent writes," they are compressing retry behavior, network failure, duplicate requests, and consistency expectations into two words.
+
+When a product designer says "progressive disclosure," they are naming an interaction pattern and a judgment about cognitive load.
+
+When a scientist says "positive control," they are specifying how to make an experiment interpretable.
+
+When an operator says "define the SLO before tuning alerts," they are preventing a whole class of noisy, meaningless monitoring work.
+
+The value is not that the words are obscure. The value is that the words have handles. They let the human and the model grab a concept at the right level.
+
+## The future is not ordinary English. It is expert English.
+
+This is why "everyone can code now" is both true and misleading.
+
+Everyone can ask an AI to make software.
+
+Not everyone can tell whether the software should be event-driven or request-driven. Not everyone can see that the proposed cache invalidation scheme is broken. Not everyone can notice that the model solved the happy path while ignoring retries, observability, permissions, schema drift, latency budgets, data retention, and failure recovery.
+
+The ability to produce code is being democratized.
+
+The ability to specify, evaluate, and constrain systems is not being democratized nearly as quickly.
+
+If anything, it may become more valuable.
+
+Brookings put the point bluntly in a 2026 essay: as AI interfaces converge on natural language, the bottleneck becomes domain knowledge. LLMs make text production easier, but they do not make judgment automatic.[^brookings]
+
+That matches what I see in practice. The person with domain expertise can ask a shorter question and get a better result. They can also reject a plausible result faster.
+
+They know what good looks like.
+
+## There is a right altitude
+
+High semantic altitude does not mean vague abstraction.
+
+"Make it enterprise grade" is not high altitude. It is fog.
+
+"Add audit logs for permission changes, including actor, target, previous value, new value, request ID, and timestamp" is lower altitude but much more useful.
+
+"Permission changes need an immutable audit trail" is higher altitude and still useful, because it carries a specific domain concept.
+
+The skill is not always to go higher. The skill is to choose the right altitude.
+
+Anthropic uses a similar framing in its writing on context engineering for agents: prompts should be clear, direct, and at the "right altitude" for the agent. Too specific, and you hardcode brittle logic. Too vague, and the model lacks the signal needed to act correctly.[^anthropic-context]
+
+That feels exactly right.
+
+The future expert will know when to say:
+
+"Use provenance metadata."
+
+And when to say:
+
+"Store `triggered_by_user_id`, `source_job_id`, `input_params_hash`, `created_at`, and `git_sha` on every job record."
+
+The first phrase gives direction. The second phrase pins down implementation.
+
+You need both.
+
+## AI raises the floor and the ceiling
+
+This is the paradox of the natural-language interface.
+
+It raises the floor because beginners can do things they could not do before.
+
+It raises the ceiling because experts can now express intent at a much higher level and let the machine fill in the lower levels.
+
+That means the gap between novice and expert does not vanish. It changes shape.
+
+The novice says:
+
+"Build me a dashboard."
+
+The expert says:
+
+"Build an operational dashboard for queue health. Prioritize lag, retry rate, dead-letter volume, consumer saturation, and p95 processing latency. It should support incident triage, not executive reporting."
+
+Both are natural language. Only one is dense with domain intent.
+
+The novice says:
+
+"Make this AI agent more reliable."
+
+The expert says:
+
+"Separate planning from execution, give tools unambiguous contracts, add evals for multi-step failure modes, and make the agent recover from tool errors without silently changing the user goal."
+
+Again: both are English. But one is ordinary language, and the other is expert language.
+
+This is why I think semantic altitude is going to go through the roof.
+
+As models improve, they will require less syntactic babysitting. The value will move from prompt tricks to intent design. From "how do I make the model respond?" to "what exactly should be true when the work is done?"
+
+## The jagged frontier needs expert pilots
+
+There is another reason expertise survives.
+
+AI capability is not smooth. It is jagged.
+
+The Harvard/BCG "jagged technological frontier" study found that consultants using GPT-4 got substantial gains on tasks inside the model's frontier, but performed worse on a task outside it. The danger was not that the model was useless. The danger was that it was useful enough to be trusted in places where it was wrong.[^jagged-frontier]
+
+That is exactly where domain expertise matters.
+
+The expert does not just prompt. The expert steers. They know when to delegate, when to inspect, when to add context, when to switch tools, when to ask for evidence, when to narrow scope, and when to throw the output away.
+
+In other words, they know how to navigate the frontier.
+
+Natural language gives everyone a steering wheel.
+
+It does not give everyone a map.
+
+## The next language layer
+
+So yes, we will talk to computers.
+
+But the way we talk will change.
+
+The early AI interface sounds like ordinary English because that is the easiest way to let everyone in. The mature AI interface will sound more like a hybrid of natural language, professional vocabulary, structured context, examples, constraints, schemas, tests, and domain-specific shorthand.
+
+It will not be programming in the old sense.
+
+It also will not be "just chatting."
+
+It will be something closer to specification by compressed expertise.
+
+The people with leverage will be the ones who can move fluidly between altitudes:
+
+High enough to express intent.
+
+Low enough to remove ambiguity.
+
+Technical enough to name the right abstraction.
+
+Concrete enough to verify the result.
+
+Natural language will make AI accessible.
+
+Expert language will make it powerful.
+
+[^patterson-ditzel]: David A. Patterson and David R. Ditzel, ["The Case for the Reduced Instruction Set Computer"](https://people.eecs.berkeley.edu/~culler/courses/cs252-s05/papers/p25-patterson.pdf), 1980.
+
+[^riscy-history]: David Patterson, ["RISCy History"](https://www.sigarch.org/riscy-history/), ACM SIGARCH, 2018.
+
+[^power-struggles]: Emily Blem, Jaikrishnan Menon, and Karthikeyan Sankaralingam, ["Power Struggles: Revisiting the RISC vs. CISC Debate on Contemporary ARM and x86 Architectures"](https://research.cs.wisc.edu/vertical/papers/2013/hpca13-isa-power-struggles.pdf), HPCA 2013.
+
+[^brooks]: Frederick P. Brooks, ["No Silver Bullet: Essence and Accidents of Software Engineering"](https://cgi.csc.liv.ac.uk/~coopes/comp319/2016/papers/NoSilverBullet-Brooks1987.htm), _Computer_, 1987.
+
+[^ousterhout]: John K. Ousterhout, ["Scripting: Higher-Level Programming for the 21st Century"](https://docslib.org/doc/11143987/scripting-higher-level-programming-for-the-21st-century), _Computer_, 1998.
+
+[^few-shot]: Tom Brown et al., ["Language Models are Few-Shot Learners"](https://papers.neurips.cc/paper/2020/hash/1457c0d6bfcb4967418bfb8ac142f64a-Abstract.html), NeurIPS 2020.
+
+[^brookings]: Michael Lokshin, ["It was never the keyboard"](https://www.brookings.edu/articles/it-was-never-the-keyboard/), Brookings, 2026.
+
+[^anthropic-context]: Anthropic, ["Effective context engineering for AI agents"](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents), 2025.
+
+[^jagged-frontier]: Fabrizio Dell'Acqua et al., ["Navigating the Jagged Technological Frontier: Field Experimental Evidence of the Effects of AI on Knowledge Worker Productivity and Quality"](https://www.hbs.edu/faculty/Pages/item.aspx?num=64700), Harvard Business School Working Paper 24-013.
