@@ -1,0 +1,147 @@
+---
+title: "Cutting LLM Output Tokens: Diffs, Not Formats"
+description: "I tried to shrink a DSPy program's output with a compact format. The format was a red herring. Emitting diffs, curating data, and fixing a lying metric were the real story."
+pubDatetime: 2026-06-17T10:00:00Z
+modDatetime: 2026-06-17T10:00:00Z
+author: "Sanket Patel"
+featured: false
+draft: false
+tags:
+  - dspy
+  - gepa
+  - architecture
+---
+
+# I tried to shrink my output with a fancy format. The format was the wrong lever.
+
+_AI-generated entry. See [What & Why](/posts/what-and-why) for context._
+
+---
+
+I have a small DSPy program that sits in front of every product scan in my app. It is a sanitizer: it takes a messy ingredient list (spelling mistakes, marketing copy, wrapped markers like `_soy_`, nutrition text that leaked into the ingredients) and returns a clean one. It runs on the hot path, so its latency and cost are real.
+
+The program emitted JSON. The output was long, and output tokens are generated one at a time, so they drive both latency and cost more than input tokens do. I read about [TOON](https://toonformat.dev/), a compact JSON-ish encoding that claims big token savings, and figured: swap the output format, get cheaper and faster output for free.
+
+That intuition was wrong in an interesting way. The format was never the bottleneck. What follows is the path from that wrong idea to a program that generates roughly five times fewer output tokens, and the two DSPy/GEPA lessons I picked up on the way.
+
+## Measure before you optimize
+
+Before changing anything, I wanted to know where the output tokens actually went. So I ran the existing program over my eval set and fit a line to the output token count against the number of ingredients.
+
+```
+output_tokens ≈ 513 + 54 * n_ingredients   (correlation 0.79)
+```
+
+Two numbers stood out. There is a fixed floor of about 513 tokens, and each ingredient costs about 54 tokens of generation. The structured answer itself, the JSON for one ingredient, is maybe six to thirteen tokens. So where do the other forty-odd tokens per ingredient go?
+
+Reasoning. The model is a reasoning model running at low effort, and it thinks about each ingredient as it goes. The actual answer is a thin slice on top of a thick layer of reasoning.
+
+This is the part TOON cannot help with. TOON compresses the answer payload, and the answer payload is the small part. I built the TOON variant anyway and measured it: output tokens moved by less than one percent. Output-neutral. It did shrink the input by about a third, because the prompt no longer had to carry a big recursive JSON schema, which was a nice latency and cost side effect. But the thing I set out to fix, output tokens, did not budge.
+
+The lesson is boring and easy to skip: measure where the tokens are before you optimize the thing you assume is expensive. I assumed encoding. It was reasoning.
+
+## Change what the model produces, not how it is encoded
+
+If reasoning scales with the number of ingredients, and the model re-derives the whole list every time, then the lever is the list. What if the model never emits the full list at all?
+
+For an already-clean product, the right answer is "no changes." For a product that needs one spelling fix, the right answer is "fix this one word." In both cases the model was re-emitting the entire ingredient list just to express a tiny delta. That is the waste.
+
+So I changed the task. Instead of returning the cleaned product, the model returns a compact edit doc: what to rename, what to remove, what to add. A clean product is `{}`. Then the program applies those edits to the input and reconstructs the full object itself, in plain Python.
+
+In DSPy terms, this is a signature change plus work in `forward`:
+
+```python
+class SanitizerSignature(dspy.Signature):
+    """Sanitize a product's ingredients. Output only the edits to apply."""
+    product_details: str = dspy.InputField()
+    explanation_of_fixes: list[str] = dspy.OutputField()
+    edits: str = dspy.OutputField(
+        desc="compact JSON: {rename: {...}, remove: [...], add: [...]}. {} if clean."
+    )
+```
+
+```python
+def forward(self, product_details: str):
+    raw = self.predict(product_details=product_details)
+    product_info, changed = apply_edits(product_details, raw.edits)
+    # re-wrap so the program's public output is identical to the old version
+    result = ReportSanitized(product_info) if changed else ReportNoChange(product_info)
+    return dspy.Prediction(result=result, explanation_of_fixes=raw.explanation_of_fixes)
+```
+
+The detail I care about most is the last line. The program's public output, the `result` object that the rest of the system and the eval metric consume, is byte-for-byte the same shape as before. Only the model's job changed, from "emit the whole object" to "emit the diff." Nothing downstream noticed. I did not touch the calling service or the metric.
+
+The result, on the same eval rows as the JSON version:
+
+| | JSON output | Edit-doc output |
+| --- | --- | --- |
+| Output tokens | baseline | about 71% fewer |
+| Latency | baseline | about 57% lower |
+| Accuracy | baseline | within noise |
+
+The output dropped far more than the size of the answer payload alone could explain. That is the real find. When the task becomes "spot the changes" instead of "reconstruct the object," the model reasons less, not just writes less. Changing the shape of the work changed the reasoning, and the reasoning was the whole cost.
+
+There was a bonus I did not expect. Because the edits are applied to the input, ingredient names that do not change are copied verbatim. The old approach re-transcribed every name and occasionally drifted. The diff approach cannot drift on the parts it does not touch.
+
+## The data told me the shape of the task
+
+Before committing to diffs, I almost made a different mistake. My first instinct was RFC 6902 JSON Patch, the standard for representing changes to a JSON document. I generated patches between input and gold for my whole dataset to estimate how big the edits would be, and the numbers looked bad: a third of the "changed" cases needed six or more operations. That looked like the diff approach would not pay off on the hard cases.
+
+It was an artifact. JSON Patch addresses array elements by index, and when you remove items from a list the indices shift, so the standard diff algorithm produces long, churny patches that are sometimes bigger than just restating the list. The complexity was in the encoding, not the task.
+
+So I looked at the actual edits in the training data instead of trusting the patch generator. Across 836 examples:
+
+- About a third needed no change at all (the edit doc is `{}`).
+- The median changed example had two semantic edits.
+- Edits were dominated by removals. The single most common problem was non-ingredient junk mixed into the list.
+- Nesting structure changed in only about 11% of cases. The edits are overwhelmingly structure-preserving.
+
+That profile is almost ideal for diffs, as long as you key edits by ingredient name rather than by array index. A name-keyed edit doc stays small on the common case and never suffers the index-shift explosion. The "we need a fallback for heavy cases" worry evaporated once I separated the task's real complexity from the patch format's accidental complexity.
+
+This is the [data curation as feature engineering](/posts/is-data-curation-new-feature-engineering) idea showing up again. I did not design the representation from first principles. I read the data, saw the shape, and picked a representation that fit it.
+
+## GEPA found rules I did not write
+
+With the representation settled, I compiled the program with GEPA. (The compile and eval ran through [Helix](/posts/helix-closing-the-loop-on-dspy-programs), so this was one command and a held-out eval, not a pile of scattered scripts.)
+
+The thing worth reporting is what GEPA put in the instruction that I had not. My hand-written prompt said the basics: fix spelling, strip markers, drop non-ingredients, split run-ons. GEPA's reflection, reading actual failures, added rules like these on its own:
+
+- If a token contains both prose and a real ingredient, like "contains less than 2% of", `rename` it down to the ingredient instead of removing the whole entry.
+- When you remove a parent ingredient that is just marketing copy, you must explicitly `add` its sub-ingredients back, because removing the parent removes its children.
+- Do not treat an OCR error of a real ingredient as junk to delete. Fix it.
+- Do not convert E-numbers to chemical names.
+
+These are exactly the edge cases I would have discovered slowly, one production bug at a time. GEPA found them by reflecting on traces against my metric. Which brings me to the part I got wrong next.
+
+## Then the metric lied to me, twice
+
+Later I wanted the sanitizer to also translate non-English ingredient names to English. I translated the gold labels, flipped the instruction, recompiled, and the held-out accuracy fell off a cliff: from about 88% down to 84%.
+
+Except the translations were good. I read them. `Farine de sarrasin` became `Buckwheat flour`. `huile de colza` became `Rapeseed oil`. So why the drop?
+
+My metric compared the gold and predicted ingredient sets by exact string match. And exact match cannot tell that a correct translation is correct. It scored all of these as misses:
+
+| Gold | Model output | Exact match |
+| --- | --- | --- |
+| almonds | almond | miss |
+| acesulfame-k | acesulfame k | miss |
+| whole durum wheat semolina | durum wheat semolina | miss |
+| milk | cow milk | miss |
+
+Plurals, hyphenation, word order, granularity. All valid, all scored zero. The 84% was not measuring translation quality. It was measuring how often the model guessed my gold label's exact wording.
+
+I added a translation-tolerant matcher to the metric: canonicalize each name (lowercase, strip markers and punctuation, singularize, sort the words) and then match, with a tight fuzzy fallback. Crucially, it still penalizes the things that should be penalized: an untranslated foreign word stays distinct from its English gold, and a genuinely wrong ingredient still misses. Under that metric, the translating model scored about 88%, a couple of points below the non-translating one, which is the real and small cost of asking for a harder task.
+
+Here is the part I almost missed. The metric was not only mis-reporting. It was mis-optimizing. GEPA optimizes whatever scalar the metric returns. With an exact-match metric, I was asking GEPA to make the model reproduce my exact gold strings, including my arbitrary choice of "rapeseed oil" over "canola oil". That is a noisy, partly meaningless target. After switching to the tolerant metric and recompiling, GEPA's reflection started learning real translation rules instead: keep culinary plurals like "oats", strip "from milk" down to "milk" but keep "from concentrate" for juices, translate generic parent categories but do not delete them.
+
+A metric in a DSPy program does double duty, and I had internalized only half of it. The score is what you report. The score is also what GEPA hill-climbs. A bad metric lies to you in the dashboard and lies to the optimizer at the same time. If your gold output has many valid surface forms, which is true for translation, paraphrase, formatting, code, you have to make the metric tolerant before you compile, not after you are confused by the number.
+
+## What I am taking away
+
+1. **Measure where the tokens go before optimizing the format.** My output was reasoning-bound, so a denser answer format did nothing. The line of best fit told me that in five minutes and saved me from shipping a non-fix.
+2. **To cut output tokens, change what the model produces, not how it is encoded.** Emitting a diff instead of the whole object reduced output by about 70%, because it reduced the reasoning, not just the characters.
+3. **Keep the program's public contract stable.** Decoding and applying the diff inside `forward` meant I could swap the entire output representation without the rest of the system, or the metric, knowing. That is what made the experiment cheap.
+4. **Read the data to pick the representation.** The task was light, removal-heavy, and structure-preserving. A name-keyed diff fit it. An index-based diff did not, and the patch generator's churn nearly fooled me into thinking the task was harder than it is.
+5. **Your metric is both the report and the objective.** When gold has many valid forms, an exact-match metric understates your quality and misdirects GEPA toward your label's wording. Make it tolerant first.
+
+The headline result is that the sanitizer now does more (it cleans and translates) while generating a fraction of the output it used to. But the lesson I will actually carry forward is smaller and more annoying: most of my early optimization instinct was aimed at the wrong layer. The win came from changing the task, reading the data, and fixing the ruler. The fancy format was a detour.
