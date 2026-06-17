@@ -1,0 +1,70 @@
+---
+title: "LLM Optimization Is a Search Problem, and DSPy Makes It Easy"
+description: "I tried seven ways to make a DSPy program faster and cheaper: three adapters, TOON, a custom adapter I almost wrote, JSON Patch, and finally diffs. Most lost. The real lesson was that DSPy and GEPA made the search cheap enough to run."
+pubDatetime: 2026-06-17T10:00:00Z
+modDatetime: 2026-06-17T10:00:00Z
+author: "Sanket Patel"
+featured: false
+draft: false
+tags:
+  - dspy
+  - gepa
+  - helix
+  - architecture
+---
+
+# How I tried seven ways to make my LLM cheaper.
+
+_AI-generated entry. See [What & Why](/posts/what-and-why) for context._
+
+---
+
+I have a small LLM step that runs in front of every product scan in [my app](https://ingredicheck.app). It takes messy product info pulled from the web, full of spelling mistakes, marketing copy, and stray nutrition text, and returns a clean ingredient list. It is on the hot path, so its latency and cost are real, and for a while it was slower and more expensive than I wanted.
+
+I eventually got it from around six seconds a call down to under a third of a second, at the same accuracy. But the interesting part is not the final trick. It is that I got there by trying seven different approaches, and six of them lost. I could not have told you in advance which one would win. I did not need to, because each experiment cost me a config change and a DSPy recompile, not a rewrite.
+
+That is the whole takeaway, so I will say it plainly up front: **this kind of optimization is a search, not a flash of insight. The thing that produced the result was being able to run the search cheaply. DSPy and GEPA are what made it cheap.**
+
+The rest of this post is the search log, and what made each step a small change instead of a project.
+
+## What made the search practically feasible
+
+Two pieces did the heavy lifting.
+
+[DSPy](https://dspy.ai) lets you describe the task declaratively. You write a signature, the inputs and outputs and their types, and DSPy handles turning that into a prompt and parsing the result. The layer that does that translation is called an adapter, and you can swap it. You can also swap the metric, the strategy, and the underlying model without touching the rest of your program. So "try a different way of asking the model for output" is usually one line.
+
+[GEPA](/posts/non-obvious-things-about-gepa) is the optimizer. It evolves your prompt by having an LLM reflect on failures against your metric and propose improvements. The point for this story is that I never hand-tuned a prompt between experiments. Every time I changed the output representation, I recompiled, and GEPA re-fit the instruction to the new shape. The experiment was always "change the representation, run compile, read the eval."
+
+Because of those two, the cost of being wrong was minutes, not days. That changes how you work. You stop arguing about which approach is best and just try them.
+
+## The search log
+
+**1. JSONAdapter (structured output).** The obvious starting point: ask the model for typed JSON and let the adapter enforce a schema. My output schema was a recursive ingredient tree, and on my model that path was slow. The provider kept falling back to a degraded JSON mode and calls took around six seconds. Too slow for the hot path.
+
+**2. BAMLAdapter.** This is the adapter you reach for when a model's native structured mode is weak; it parses more forgivingly than strict JSON. The catch was my output shape. An ingredient can contain sub-ingredients, so the schema is a recursive tree, and that recursion was awkward to express through this adapter. Not the fix either.
+
+**3. ChatAdapter.** This one asks for output in a loose, marker-delimited text format instead of enforced JSON. Free-form, no schema enforcement. It dropped per-call latency from around six seconds to under two, at equal accuracy. A one-line config change bought a three times speedup. This was the first real win, and it came purely from swapping how the model was asked to answer.
+
+**4. TOON.** Next I went after the output size, since output tokens are generated one at a time and drive latency. [TOON](https://toonformat.dev/) is a compact, JSON-ish encoding that promises big token savings. I built the variant and measured it, and output tokens barely moved. When I plotted output length against the number of ingredients, the answer was clear: the output was reasoning-bound. The model spends most of its tokens reasoning about each ingredient, and the structured answer is a thin slice on top. Compressing the slice does nothing. TOON was output-neutral here. The format was not the lever.
+
+**5. The ToonAdapter I did not write.** TOON is not a built-in DSPy adapter, so to make the model natively emit and parse TOON I would have written one. DSPy makes that straightforward, you subclass the adapter and override how fields are rendered and parsed. I sketched it out. Then I remembered step 4: the problem was reasoning, not encoding, and a cleaner encoding would not change what the model reasons about. So I did not build it. Knowing the tooling can do something is not a reason to do it.
+
+**6. JSON Patch.** If the cost scales with re-emitting the whole list, what if the model emits only what changed? My first instinct was RFC 6902, standard JSON Patch. I generated patches across my dataset to size them up, and they looked bad: a third of the changed cases needed many operations. That turned out to be an artifact. JSON Patch addresses array items by index, and when you remove items the indices shift, so the diff churns and sometimes ends up bigger than the original list. The complexity was in the patch format, not the task. A trap.
+
+**7. Name-keyed diffs.** So I dropped the index-based format and let the model emit a small edit doc keyed by ingredient name: what to rename, what to remove, what to add. A clean product is an empty object. The program applies those edits to the input and reconstructs the full result itself, in plain Python, and re-wraps it so everything downstream sees the exact same output shape as before. This was the win: about seventy percent fewer output tokens, about fifty seven percent lower latency, accuracy within noise. Under a third of a second a call.
+
+And here is where GEPA paid off again. Once the task was "emit the diff," I recompiled, and GEPA's reflection discovered edit rules I had not written: if a token is half prose and half ingredient, rename it down instead of deleting the whole thing; when you remove a marketing parent like "contains less than 2% of", add its real sub-ingredients back. I would have found those one production bug at a time. The optimizer found them by reading traces against my metric.
+
+Why did diffs work when TOON did not? Because they changed what the model produces, not how it is encoded. Emitting a diff instead of the whole object means the model is spotting changes, not reconstructing a list, and that shrinks the reasoning, which was the actual cost.
+
+## The point
+
+Seven approaches. Three adapters, a compact format, a custom adapter I talked myself out of, a patch standard that backfired, and finally diffs. Six of them did not make it to production. I want to be honest that I did not deduce the winner. I found it by trying things, and I could afford to try things because DSPy made each one a small change and GEPA re-optimized the prompt for me every time.
+
+If you take the trick, name-keyed diffs instead of full objects, you get one good idea for one program. If you take the method, treat optimization as a cheap search over representations and let an optimizer tune each one, you get a way of working.
+
+## The plug
+
+The loop I kept running, define the program, swap a piece, compile, eval, repeat, is exactly what I am building [Helix](/posts/helix-closing-the-loop-on-dspy-programs) to make routine. Helix runs DSPy compile and eval as managed jobs, and it is driven entirely by agent skills. So "try the BAML adapter," "compile this," "eval it on the held-out split" are each about as easy as it gets: you ask your coding agent, and the job runs, with the results and traces collected in one place instead of scattered across scripts and notebooks you cannot rerun next week.
+
+Every experiment in this post was a step in that loop. The faster the loop, the more of the search you can afford, and the search is where the wins are.
