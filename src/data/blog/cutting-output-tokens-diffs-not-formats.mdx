@@ -1,6 +1,6 @@
 ---
-title: "LLM Optimization Is a Search Problem"
-description: "I tried seven ways to make a DSPy program faster and cheaper: three adapters, TOON, a custom adapter I almost wrote, JSON Patch, and finally diffs. Most lost. The real lesson was that DSPy and GEPA made the search cheap."
+title: "LLM Optimization Is a Search Problem, and DSPy Makes It Cheap"
+description: "I tried seven ways to make a DSPy program faster and cheaper: three adapters, TOON, a custom adapter I almost wrote, JSON Patch, and finally diffs. Most lost. The real lesson was that DSPy and GEPA made the search cheap enough to run."
 pubDatetime: 2026-06-17T10:00:00Z
 modDatetime: 2026-06-17T10:00:00Z
 author: "Sanket Patel"
@@ -13,21 +13,21 @@ tags:
   - architecture
 ---
 
-# I tried seven ways to make my LLM cheaper. The winner was not the point.
+# I tried seven ways to make my LLM cheaper, and DSPy plus GEPA made trying them easy.
 
 _AI-generated entry. See [What & Why](/posts/what-and-why) for context._
 
 ---
 
-I have a small LLM step that runs in front of every product scan in my app. It takes a messy ingredient list, full of spelling mistakes, marketing copy, and stray nutrition text, and returns a clean one. It is on the hot path, so its latency and cost are real, and for a while it was slower and more expensive than I wanted.
+I have a small LLM step that runs in front of every product scan in [my app](https://ingredicheck.app). It takes messy product info pulled from the web, full of spelling mistakes, marketing copy, and stray nutrition text, and returns a clean ingredient list. It is on the hot path, so its latency and cost are real, and for a while it was slower and more expensive than I wanted.
 
-I eventually got it from around six seconds a call down to under a third of a second, at the same accuracy. But the interesting part is not the final trick. It is that I got there by trying seven different approaches, and six of them lost. I could not have told you in advance which one would win. I did not need to, because each experiment cost me a config change and a recompile, not a rewrite.
+I eventually got it from around six seconds a call down to under a third of a second, at the same accuracy. But the interesting part is not the final trick. It is that I got there by trying seven different approaches, and six of them lost. I could not have told you in advance which one would win. I did not need to, because each experiment cost me a config change and a DSPy recompile, not a rewrite.
 
 That is the whole takeaway, so I will say it plainly up front: **this kind of optimization is a search, not a flash of insight. The thing that produced the result was being able to run the search cheaply. DSPy and GEPA are what made it cheap.**
 
 The rest of this post is the search log, and what made each step a small change instead of a project.
 
-## What made the search cheap
+## What made the search practically feasible
 
 Two pieces did the heavy lifting.
 
@@ -41,7 +41,7 @@ Because of those two, the cost of being wrong was minutes, not days. That change
 
 **1. JSONAdapter (structured output).** The obvious starting point: ask the model for typed JSON and let the adapter enforce a schema. My output schema was a recursive ingredient tree, and on my model that path was slow. The provider kept falling back to a degraded JSON mode and calls took around six seconds. Too slow for the hot path.
 
-**2. BAMLAdapter.** This is the adapter you reach for when you need reliable structured output from a model whose native structured mode is weak. It parses more forgivingly than strict JSON. It worked, but it did not solve the latency.
+**2. BAMLAdapter.** This is the adapter you reach for when a model's native structured mode is weak; it parses more forgivingly than strict JSON. The catch was my output shape. An ingredient can contain sub-ingredients, so the schema is a recursive tree, and that recursion was awkward to express through this adapter. Not the fix either.
 
 **3. ChatAdapter.** This one asks for output in a loose, marker-delimited text format instead of enforced JSON. Free-form, no schema enforcement. It dropped per-call latency from around six seconds to under two, at equal accuracy. A one-line config change bought a three times speedup. This was the first real win, and it came purely from swapping how the model was asked to answer.
 
@@ -65,6 +65,6 @@ If you take the trick, name-keyed diffs instead of full objects, you get one goo
 
 ## The plug
 
-The loop I kept running, define the program, swap a piece, compile, eval, repeat, is exactly what I am building [Helix](/posts/helix-closing-the-loop-on-dspy-programs) to make routine. The idea is to run DSPy compile and eval as managed jobs you drive with a few skills, so that "try the BAML adapter," "compile this," "eval it on the held-out split" are one command each, with the results and traces in one place, instead of scattered scripts and notebooks you cannot rerun next week.
+The loop I kept running, define the program, swap a piece, compile, eval, repeat, is exactly what I am building [Helix](/posts/helix-closing-the-loop-on-dspy-programs) to make routine. Helix runs DSPy compile and eval as managed jobs, and it is driven entirely by agent skills. So "try the BAML adapter," "compile this," "eval it on the held-out split" are each about as easy as it gets: you ask your coding agent, and the job runs, with the results and traces collected in one place instead of scattered across scripts and notebooks you cannot rerun next week.
 
 Every experiment in this post was a step in that loop. The faster the loop, the more of the search you can afford, and the search is where the wins are.
