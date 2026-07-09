@@ -32,7 +32,7 @@ The punchline first: **there is no mapping table.** DSPy and GEPA share one dict
 
 Let me make this concrete. Here is a small DSPy program that turns a support ticket into a drafted reply. Three agents, each a `dspy.ChainOfThought`.
 
-> A side note on the word "agent." These three are not agents in the strict sense: no tool use, no loop, no autonomy. They are just predictors in a fixed pipeline, and I am calling them agents to keep the example readable. The point that matters here is that each one is a separate _predictor with its own instruction_. Swap any of them for a real `dspy.ReAct` agent running a tool-use loop and nothing about the GEPA story changes: it is still a named predictor with an instruction, still one key in the candidate dict, still selected and rewritten one component at a time.
+> A side note on the word "agent." These three are not agents in the strict sense: no tool use, no loop, no autonomy. They are just predictors in a fixed pipeline, and I am calling them agents to keep the example readable. But the GEPA story does not depend on that simplification. Swap any of them for a real `dspy.ReAct` agent and the picture only widens: a `ReAct` module is itself built from predictors — one that drives the reasoning-and-tool-call loop, and one that extracts the final answer — so it contributes _two_ keys to the candidate dict, not one. GEPA still does the same thing to each: every predictor is its own named component, selected and rewritten one at a time. A multi-agent system is just a program with more predictors, and GEPA sees all of them as keys in the same dict.
 
 ```python
 import dspy
