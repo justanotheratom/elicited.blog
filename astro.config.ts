@@ -2,6 +2,7 @@ import { defineConfig, envField } from "astro/config";
 import tailwindcss from "@tailwindcss/vite";
 import sitemap from "@astrojs/sitemap";
 import mdx from "@astrojs/mdx";
+import mermaid from "astro-mermaid";
 import remarkToc from "remark-toc";
 import remarkCollapse from "remark-collapse";
 import {
@@ -55,6 +56,12 @@ const shouldIncludeInSitemap = (page: string) => {
 export default defineConfig({
   site: SITE.website,
   integrations: [
+    // Must come before mdx() so mermaid code fences are transformed
+    // before markdown/MDX processing and Shiki highlighting.
+    mermaid({
+      theme: "neutral",
+      autoTheme: true,
+    }),
     sitemap({
       filter: shouldIncludeInSitemap,
     }),
