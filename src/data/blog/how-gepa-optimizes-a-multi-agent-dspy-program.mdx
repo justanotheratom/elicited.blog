@@ -313,14 +313,14 @@ It would be tempting to think GEPA should optimize all three agents together. It
 
 Each agent gets optimized against the _current_ behavior of its neighbors. When the reply drafter improves, the failures that remain change, so the feedback the triager sees on its next turn is different. The agents co-adapt instead of being tuned in isolation. This is also where GEPA's [deterministic merge step](/posts/non-obvious-things-about-gepa) earns its keep — it can recombine a candidate whose triager is great with another whose drafter is great, because each agent lives under its own key.
 
-| Step | Owner | What happens |
-| ---- | ----- | ------------ |
-| Seed | DSPy | `named_predictors()` → `dict[name → instruction]` |
-| Select | GEPA | Round-robin returns one name, e.g. `["triage.predict"]` |
-| Reflect dataset | DSPy | Filter traces to that agent, attach feedback |
-| Propose | DSPy | Reflection LM rewrites `candidate[name]` |
-| Write back | GEPA | Overwrite that one key; keep if it wins |
-| Rebuild | DSPy | `if name in candidate` → install instruction |
+| Step            | Owner | What happens                                            |
+| --------------- | ----- | ------------------------------------------------------- |
+| Seed            | DSPy  | `named_predictors()` → `dict[name → instruction]`       |
+| Select          | GEPA  | Round-robin returns one name, e.g. `["triage.predict"]` |
+| Reflect dataset | DSPy  | Filter traces to that agent, attach feedback            |
+| Propose         | DSPy  | Reflection LM rewrites `candidate[name]`                |
+| Write back      | GEPA  | Overwrite that one key; keep if it wins                 |
+| Rebuild         | DSPy  | `if name in candidate` → install instruction            |
 
 If you are running GEPA on a real multi-agent system, the practical takeaways are small but real. Give each agent a distinct signature so trace attribution stays clean. Write per-`pred_name` feedback in your metric so each agent gets pointed criticism instead of a program-level shrug. And expect the run to take a while, because the cursor has to make several passes before the agents settle into prompts that actually cooperate.
 
